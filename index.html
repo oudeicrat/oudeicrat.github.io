@@ -19,8 +19,11 @@
 			var userLat = 0.00;
 			var userLng = 0.00;
 			var minutesOffset = 0;
+			
+			//TODO: is this used?
 			var localDate = new Date(); //local datetime in the current timezone
 			var refDate = new Date(localDate.getTime() + localDate.getTimezoneOffset()*60000); //GMT (UTC) datetime (JS date object retains local timezone information although the datetime itself is the UTC value)
+			
 			var declination = 0; 
 			
 			function gpsToMapXY(lat,lng) {
@@ -175,7 +178,7 @@
 			
 			function outputDateTime(d) {
 				document.getElementById('dateTimeInput').value = d.getFullYear() + '-' + String('0'+(d.getMonth()+1)).slice(-2)
-					+ '-' + d.getDate() + ' ' + String('0'+d.getHours()).slice(-2) + ':' 
+					+ '-' + String('0'+d.getDate()).slice(-2) + ' ' + String('0'+d.getHours()).slice(-2) + ':' 
 					+ String('0'+d.getMinutes()).slice(-2) + ':' + String('0'+d.getSeconds()).slice(-2);
 			}
 
@@ -205,7 +208,11 @@
 				
 				//var d = new Date(refDate.getTime() + minutesOffset*60000);
 				var d = new Date(document.getElementById('dateTimeInput').value);
-				if (d == 'Invalid Date') d = new Date();
+				if (d == 'Invalid Date') {
+					var localDate = new Date(); //local datetime in the current timezone
+					//TODO: instead get local date relative to observer location coordinates
+					d = new Date(localDate.getTime() + localDate.getTimezoneOffset()*60000); //GMT (UTC) datetime (JS date object retains local timezone information although the datetime itself is the UTC value)
+				}
 				
 				outputDateTime(d);
 
@@ -222,6 +229,37 @@
 					drawCompassGps(userLat, userLng, '#0f7', 12, 2);
 				}
 				
+				document.getElementById('sunPosCheckLink').href = 'https://www.timeanddate.com/worldclock/sunearth.html?month='
+					+ (d.getMonth()+1) + '&day=' + d.getDate() + '&year=' + d.getFullYear() + '&hour='
+					+ d.getHours() + '&min=' + d.getMinutes() + '&ntxt=London';
+					
+				var timeZoneDbUrl = 'http://api.timezonedb.com/v2.1/get-time-zone?key=H57PYG9KKM6P&format=json&by=position&lat='
+					+ (Math.round(userLat*100)/100) + '&lng=' + (Math.round(userLng*100)/100);
+				var xhr = new XMLHttpRequest();
+				//xhr.addEventListener('load', function() {
+				//xhr.onreadystatechange = function() {
+				xhr.onload = function() {
+					if (this.readyState == 4 && this.status == 200) {
+						var jsonData = JSON.parse(this.responseText);
+						//console.log(jsonData);
+						if ('status' in jsonData && jsonData.status=='OK' && 'gmtOffset' in jsonData) {
+							var gmtOffset = jsonData.gmtOffset; //eg. GMT+1 -> gmtOffset = 3600
+							
+							var localDate = new Date(d.getTime() + gmtOffset*1000);
+		
+							document.getElementById('azimuthCheckLink').href = 'https://www.suncalc.org/#/'
+								+ (Math.round(userLat*100)/100) + ',' + (Math.round(userLng*100)/100) + ',2/'
+								+ localDate.getFullYear()+'.'+String('0'+(localDate.getMonth()+1)).slice(-2)+'.'+String('0'+localDate.getDate()).slice(-2)
+								+ '/' + String('0'+localDate.getHours()).slice(-2) + ':' + String('0'+localDate.getMinutes()).slice(-2) + '/1/0';
+						} else {
+							document.getElementById('azimuthCheckLink').href = 'https://www.suncalc.org/'; //sometimes timezone is not found (for example in the ocean)
+						}
+					} else { alert('requesting timezonedb.com failed'); }
+					
+				};
+				xhr.open('get', timeZoneDbUrl);
+				//console.log('requesting timezonedb.com');
+				xhr.send();
 			}
 			function load() {
 				outputDateTime(refDate);
@@ -250,9 +288,11 @@
 	<body onload="load();">
 		<img id="mapimg" src="gleasonmap.jpg" style="display:none;" />
 		Greenwich London time: <input type="text" id="dateTimeInput" value="" /><button onclick="setTimeout('redraw();',10);">UTC</button>
-		Sun pos: <input type="text" id="latLongOutput" value="" readonly="readonly" />
-		observer location: <input type="text" id="latLongInput" value="0.00, 0.00" /><button onclick="setTimeout('redraw();',10);">GO</button>
-		zenith, azimuth: <input type="text" id="zenAzOutput" value="0.00, 0.00" readonly="readonly" />
+		Sun pos: <input type="text" id="latLongOutput" value="" readonly="readonly" style="width:120px" />
+		<a id="sunPosCheckLink" href="https://www.timeanddate.com/worldclock/sunearth.html">(check)</a>
+		Observer location: <input type="text" id="latLongInput" value="0.00, 0.00" /><button onclick="setTimeout('redraw();',10);">GO</button>
+		Zenith, azimuth: <input type="text" id="zenAzOutput" value="0.00, 0.00" readonly="readonly" style="width:120px" />
+		<a id="azimuthCheckLink" href="https://suncalc.org/">(check)</a>
 		<br />
 		<canvas id="map"></canvas>
 	</body>
