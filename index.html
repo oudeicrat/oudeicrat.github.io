@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv=Content-Type content="text/html; charset=utf-8">
+		<title>Flat Earth Map and Sun Position</title>
+		<script type="text/javascript">
+			//https://astronomy.stackexchange.com/questions/20560/how-to-calculate-the-position-of-the-sun-in-long-lat
+			//Latitude of the Geographical Position (GP) is called Declination, and it is numerically equal 
+			//to what one might call "Latitude". It is measured in degrees North or South the equator.
+			//Longitude of the GP is called Greenwich Hour Angle (GHA)
+			
+			//http://answers.google.com/answers/threadview/id/782886.html
+			//https://gist.github.com/jgomezdans/733741/
+			
+			var canvasSize;
+			var imgmapSize;
+			var imgOffsetX = 20;
+			var imgOffsetY = 20;
+			var userLat = 0.00;
+			var userLng = 0.00;
+			var minutesOffset = 0;
+			var localDate = new Date(); //local datetime in the current timezone
+			var refDate = new Date(localDate.getTime() + localDate.getTimezoneOffset()*60000); //GMT (UTC) datetime (JS date object retains local timezone information although the datetime itself is the UTC value)
+			var declination = 0; 
+			
+			function gpsToMapXY(lat,lng) {
+				var y = imgOffsetY+imgmapSize/2+(90-lat)/360*imgmapSize*Math.cos(-lng/180*Math.PI);
+				var x = imgOffsetX+imgmapSize/2+(lat-90)/360*imgmapSize*Math.sin(-lng/180*Math.PI);
+				return {x,y};
+			}
+			function drawPointGps(lat,lng,color,radius) {
+				var ctx = document.getElementById('map').getContext('2d');
+				ctx.fillStyle = color;
+				ctx.beginPath();
+				coord = gpsToMapXY(lat,lng);
+				ctx.arc(coord.x, coord.y, radius, 0, 2*Math.PI, true);
+				ctx.fill();			
+			}
+			function drawCompassGps(lat,lng,color,radius,thickness) {
+				var ctx = document.getElementById('map').getContext('2d');
+				coord = gpsToMapXY(lat,lng);
+				ctx.lineWidth = thickness;
+				ctx.strokeStyle = color;
+				ctx.beginPath();
+				
+				ctx.moveTo(coord.x - Math.sin(rad(lng))*radius, coord.y - Math.cos(rad(lng))*radius);
+				ctx.lineTo(coord.x + Math.sin(rad(lng))*radius, coord.y + Math.cos(rad(lng))*radius);
+				ctx.stroke();
+				
+				ctx.moveTo(coord.x - Math.cos(rad(lng))*radius, coord.y + Math.sin(rad(lng))*radius);
+				ctx.lineTo(coord.x + Math.cos(rad(lng))*radius, coord.y - Math.sin(rad(lng))*radius);
+				ctx.stroke();
+
+				ctx.font = '14px Arial';
+				ctx.fillStyle = color;
+				ctx.fillText('N', Math.round(coord.x - Math.sin(rad(lng))*radius*2 - 4), Math.round(coord.y - Math.cos(rad(lng))*radius*2 + 6) );
+				
+			}
+			function drawArrow(lat,lng,az) {
+				var ctx = document.getElementById('map').getContext('2d');
+				coord = gpsToMapXY(lat,lng);
+				ctx.lineWidth = 3;
+				ctx.strokeStyle = '#f32';
+				ctx.beginPath();
+				
+				var arrowSize = 50;
+				var arrowDirection = az - userLng; //because AZ is relative to observer
+				
+				ctx.moveTo(coord.x, coord.y);
+				var arrowX = coord.x + Math.sin(rad(arrowDirection)) * arrowSize;
+				var arrowY = coord.y - Math.cos(rad(arrowDirection)) * arrowSize;
+				ctx.lineTo(arrowX, arrowY);
+				ctx.stroke();
+				
+				var arrowAngle = 10;
+				var arrowLength = Math.round(2*arrowSize / 3); 
+				
+				ctx.moveTo(arrowX, arrowY);
+				ctx.lineTo(coord.x + Math.sin(rad(arrowDirection+arrowAngle)) * arrowLength, coord.y - Math.cos(rad(arrowDirection+arrowAngle)) * arrowLength);
+				ctx.stroke();
+				
+				ctx.moveTo(arrowX, arrowY);
+				ctx.lineTo(coord.x + Math.sin(rad(arrowDirection-arrowAngle)) * arrowLength, coord.y - Math.cos(rad(arrowDirection-arrowAngle)) * arrowLength);
+				ctx.stroke();
+
+				ctx.lineWidth = 1;
+				ctx.moveTo(coord.x, coord.y);
+				arrowSize = imgmapSize; //TODO: limit to the edge of canvas
+				ctx.lineTo(coord.x + Math.sin(rad(arrowDirection)) * arrowSize, coord.y - Math.cos(rad(arrowDirection)) * arrowSize);
+				ctx.stroke();
+			}
+			
+			function drawMap() {
+				var canvas = document.getElementById('map');
+				var ctx = canvas.getContext('2d');
+				var imageObj = document.getElementById('mapimg');
+				canvasSize = window.innerHeight;;
+				if (window.innerWidth < canvasSize) canvasSize = window.innerWidth;
+				ctx.canvas.width = canvasSize;
+				ctx.canvas.height = canvasSize;
+				imgmapSize = canvasSize-40;
+				ctx.drawImage(imageObj, imgOffsetX, imgOffsetY,imgmapSize,imgmapSize);
+			}
+			
+			function rad(deg) { return deg * Math.PI / 180; } 
+			
+			function getSunPos(relativeDate) { //Date relativeDate
+				//https://gist.github.com/jgomezdans/733741/
+				
+				//doy calculation form:
+				//https://stackoverflow.com/questions/8619879/javascript-calculate-the-day-of-the-year-1-366
+				var startDate = new Date(relativeDate.getFullYear(), 0, 0);
+				var diff = (relativeDate - startDate) + ((startDate.getTimezoneOffset() - relativeDate.getTimezoneOffset()) * 60 * 1000);
+				var oneDay = 1000 * 60 * 60 * 24;
+				var doy = Math.floor(diff / oneDay);
+				//console.log('doy = ',doy);
+				var h = relativeDate.getHours() + relativeDate.getMinutes()/60;
+				//console.log('h = ',h);
+				//gdeg = (360/365.25)*(doy+ h/24)
+				//g = radians(gdeg)
+				var g = (2/365.25)*(doy + h/24)*Math.PI;
+				//console.log('g(rad) = ',g);
+				//console.log('g(deg) = ',g*180/Math.PI);
+				//declination = sun Geographical Position latitude (absolute)
+				var D = 0.396372-22.91327*Math.cos(g)+4.02543*Math.sin(g)-0.387205*Math.cos(2*g) 
+					+ 0.051967*Math.sin(2*g)-0.154527*Math.cos(3*g) + 0.084798*Math.sin(3*g);
+				//console.log('D = ',D);
+				//solar angle time correction
+				var TC = 0.004297+0.107029*Math.cos(g)-1.837877*Math.sin(g) - 0.837378*Math.cos(2*g) - 2.340475*Math.sin(2*g);
+				//console.log('TC = ',TC);
+				//Solar Hour Angle relative to observer SHArto = (hour-12)*15 + Longitude + TC
+				var SHArto = (h-12)*15 + userLng + TC;  
+				if (SHArto > 180) {
+					SHArto = SHArto - 360;
+				} else if (SHArto < -180) {
+					SHArto = SHArto + 360;
+				}
+				//console.log('userLng(deg) = ',userLng);
+				//console.log('SHA relative to observer (deg) = ',SHArto);
+				//absolute SHA = absolute sun Geographical Position longitude
+				var SHAa = (12-h)*15 - TC;  
+				if (SHAa > 180) {
+					SHAa = SHAa - 360;
+				} else if (SHAa < -180) {
+					SHAa = SHAa + 360;
+				}
+				//console.log('absolute SHA (deg) = ',SHAa);
+				
+				//zenith (relative to observer)
+				//cos(SZA) = sin(Latitude)*sin(D)+cos(Latitude)*cos(D)*cos(SHA)
+				var cosSZA = Math.sin(rad(userLat)) * Math.sin(rad(D)) + Math.cos(rad(userLat)) * Math.cos(rad(D)) * Math.cos(rad(SHArto));
+ 				if (cosSZA > 1.00) cosSZA = 1.00;
+ 				if (cosSZA < -1.00) cosSZA = -1.00;
+ 				//console.log('cosSZA = ',cosSZA);
+ 				var SZArad = Math.acos(cosSZA);
+ 				//console.log('SZArad = ',SZArad);
+ 				var SZA = SZArad * 180 / Math.PI;
+ 				//console.log('SZA = ',SZA);
+   
+				//azimuth (relative to observer)
+				//cos(AZ) = (sin(D)-sin(Latitude)*cos(SZA))/(cos(Latitude)*sin(SZA))
+				var cosAZ = (Math.sin(rad(D)) - Math.sin(rad(userLat)) * Math.cos(SZArad)) / (Math.cos(rad(userLat)) * Math.sin(SZArad));
+ 				if (cosAZ > 1.00) cosAZ = 1.00;
+ 				if (cosAZ < -1.00) cosAZ = -1.00;
+ 				//console.log('cosAZ = ',cosAZ);
+				var AZ = Math.acos(cosAZ) * 180 / Math.PI;
+				if (SHArto>0) AZ = 360 - AZ; //https://en.wikipedia.org/wiki/Solar_azimuth_angle#Formulas "...between 180 and 360 degrees when the hour angle is positive (afternoon)"
+				//console.log('AZ = ',AZ);
+				
+				return {'lat':D, 'lng':SHAa, 'az':AZ, 'zen':SZA }; //lat,lng = absolute; az,zen = relative to observer  
+			}
+			
+			//compare to: https://www.timeanddate.com/worldclock/sunearth.html
+			
+			
+			function outputDateTime(d) {
+				document.getElementById('dateTimeInput').value = d.getFullYear() + '-' + String('0'+(d.getMonth()+1)).slice(-2)
+					+ '-' + d.getDate() + ' ' + String('0'+d.getHours()).slice(-2) + ':' 
+					+ String('0'+d.getMinutes()).slice(-2) + ':' + String('0'+d.getSeconds()).slice(-2);
+			}
+
+			
+			function redraw() {
+				drawMap();
+				var parsedUserLocation = /^(-?[0-9]+(?:.[0-9]+)?)[\s,;]+(-?[0-9]+(?:.[0-9]+)?)$/.exec(document.getElementById('latLongInput').value);
+				if (
+					//typeof parsedUserLocation != 'null' &&
+					typeof parsedUserLocation != 'undefined' &&
+					parsedUserLocation != null &&
+					//parsedUserLocation != false &&
+					'1' in  parsedUserLocation &&
+					'2' in  parsedUserLocation &&
+					typeof parsedUserLocation[1] != 'undefined' &&  
+					typeof parsedUserLocation[2] != 'undefined' &&
+					'NaN' != parseFloat(parsedUserLocation[1]) &&
+					'NaN' != parseFloat(parsedUserLocation[2])
+				) {
+					userLat = Math.round(parseFloat(parsedUserLocation[1])*100)/100;
+					userLng = Math.round(parseFloat(parsedUserLocation[2])*100)/100;
+					
+					document.getElementById('latLongInput').value = (Math.round(userLat*100)/100) + ', ' + (Math.round(userLng*100)/100);
+				} else {
+					alert('unknown GPS format, use -12.34, 56.78');
+				}
+				
+				//var d = new Date(refDate.getTime() + minutesOffset*60000);
+				var d = new Date(document.getElementById('dateTimeInput').value);
+				if (d == 'Invalid Date') d = new Date();
+				
+				outputDateTime(d);
+
+				var sunPos = getSunPos(d);
+				document.getElementById('latLongOutput').value = Math.round(sunPos.lat*100)/100 + ', ' + Math.round(sunPos.lng*100)/100;
+				document.getElementById('zenAzOutput').value = Math.round(sunPos.zen*100)/100 + ', ' + Math.round(sunPos.az*100)/100;
+				if (sunPos.zen > 100) { //sun below horizon (>90 + padding)
+					drawPointGps(sunPos.lat, sunPos.lng, '#000', 10);
+					//drawArrow(userLat, userLng, sunPos.az);
+					drawCompassGps(userLat, userLng, '#000', 12, 2);
+				} else { //sun above horizon
+					drawPointGps(sunPos.lat, sunPos.lng, '#ff0', 10);
+					drawArrow(userLat, userLng, sunPos.az);
+					drawCompassGps(userLat, userLng, '#0f7', 12, 2);
+				}
+				
+			}
+			function load() {
+				outputDateTime(refDate);
+				
+				navigator.geolocation.getCurrentPosition(function(position) {
+					document.getElementById('latLongInput').value = (Math.round(position.coords.latitude*100)/100) + ' ' + (Math.round(position.coords.longitude*100)/100);
+					setTimeout('redraw();',10);
+				},function(){ setTimeout('redraw();',10); });
+				
+				document.getElementById('dateTimeInput').addEventListener('keyup', function(event) {
+					event.preventDefault();
+					if (event.keyCode === 13) {
+						setTimeout('redraw();',10);
+					}
+				});				
+				document.getElementById('latLongInput').addEventListener('keyup', function(event) {
+					event.preventDefault();
+					if (event.keyCode === 13) {
+						setTimeout('redraw();',10);
+					}
+				});				
+				
+			}
+		</script>
+	</head>
+	<body onload="load();">
+		<img id="mapimg" src="mapcrop.jpg" style="display:none;" />
+		Greenwich London time: <input type="text" id="dateTimeInput" value="" /><button onclick="setTimeout('redraw();',10);">UTC</button>
+		Sun pos: <input type="text" id="latLongOutput" value="" readonly="readonly" />
+		observer location: <input type="text" id="latLongInput" value="0.00, 0.00" /><button onclick="setTimeout('redraw();',10);">GO</button>
+		zenith, azimuth: <input type="text" id="zenAzOutput" value="0.00, 0.00" readonly="readonly" />
+		<br />
+		<canvas id="map"></canvas>
+	</body>
+</html>
