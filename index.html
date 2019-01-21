@@ -233,7 +233,7 @@
 					+ (d.getMonth()+1) + '&day=' + d.getDate() + '&year=' + d.getFullYear() + '&hour='
 					+ d.getHours() + '&min=' + d.getMinutes() + '&ntxt=London';
 					
-				var timeZoneDbUrl = 'http://api.timezonedb.com/v2.1/get-time-zone?key=H57PYG9KKM6P&format=json&by=position&lat='
+				var timeZoneDbUrl = 'https://api.timezonedb.com/v2.1/get-time-zone?key=H57PYG9KKM6P&format=json&by=position&lat='
 					+ (Math.round(userLat*100)/100) + '&lng=' + (Math.round(userLng*100)/100);
 				var xhr = new XMLHttpRequest();
 				//xhr.addEventListener('load', function() {
