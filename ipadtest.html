@@ -240,8 +240,8 @@
 					typeof parsedUserLocation != 'undefined' &&
 					parsedUserLocation != null &&
 					//parsedUserLocation != false &&
-					'1' in  parsedUserLocation &&
-					'2' in  parsedUserLocation &&
+					'1' in parsedUserLocation &&
+					'2' in parsedUserLocation &&
 					typeof parsedUserLocation[1] != 'undefined' &&  
 					typeof parsedUserLocation[2] != 'undefined' &&
 					'NaN' != parseFloat(parsedUserLocation[1]) &&
@@ -256,13 +256,40 @@
 					alert('unknown GPS format, use -12.34, 56.78');
 				}
 				
-				var d = new Date(document.getElementById('dateTimeInput').value+' UTC');
+				var d = null;
+				var parsedDate = /^([0-9]{4})[-]([0-9]{1,2})[-]([0-9]{1,2})(?:[ ]([0-9]{1,2})[:]([0-9]{1,2})(?:[:]([0-9]{1,2}))?)?$/.exec(document.getElementById('dateTimeInput').value);
+				if (
+					typeof parsedDate != 'undefined' &&
+					parsedDate != null &&
+					'1' in parsedDate &&
+					'2' in parsedDate &&
+					'3' in parsedDate &&
+					typeof parsedDate[1] != 'undefined' &&  
+					typeof parsedDate[2] != 'undefined' &&
+					typeof parsedDate[3] != 'undefined' &&
+					'NaN' != parseInt(parsedDate[1]) &&
+					'NaN' != parseInt(parsedDate[2]) &&
+					'NaN' != parseInt(parsedDate[3])
+				) {
+					if (!('4' in parsedDate) || typeof parsedDate[4] == 'undefined' || 'NaN'==parseInt(parsedDate[4])) parsedDate[4] = 0; 
+					if (!('5' in parsedDate) || typeof parsedDate[5] == 'undefined'  || 'NaN'==parseInt(parsedDate[5])) parsedDate[5] = 0; 
+					if (!('6' in parsedDate) || typeof parsedDate[6] == 'undefined'  || 'NaN'==parseInt(parsedDate[6])) parsedDate[6] = 0; 
 				
-				if (d == 'Invalid Date' || d == 'NaN') { //use current time if no valid value entered
+					d = new Date(Date.UTC(
+						parseInt(parsedDate[1]),
+						parseInt(parsedDate[2])-1,
+						parseInt(parsedDate[3]),
+						parseInt(parsedDate[4]),
+						parseInt(parsedDate[5]),
+						parseInt(parsedDate[6]),
+					));
+				}
+				
+				if (d === null || d == 'Invalid Date' || d == 'NaN') { //use current time if no valid value entered
 					
 					document.getElementById('debug').innerHTML += 'entered datetime not recognized, using browser datetime<br />';
 					
-					var d = new Date(); //browser datetime in the timezone of the browser
+					d = new Date(); //browser datetime in the timezone of the browser
 					outputUTCDateTime(d);
 
 					localGmtOffset = d.getTimezoneOffset()*60000;
