@@ -132,12 +132,14 @@
 			function getSunPos(d) {
 				//https://gist.github.com/jgomezdans/733741/
 				
-				var startDate = new Date(d.getUTCFullYear()+'-01-01 00:00:00 GMT');
+				var startDateString = d.getUTCFullYear()+'-01-01 00:00:00 GMT';
+				var startDate = new Date(startDateString);
 				
-				document.getElementById('debug').innerHTML += 'startDate = ' + startDate + '<br />';
+				document.getElementById('debug').innerHTML += 'startDate "'+startDateString+'" = ' + startDate + '<br />';
 				
-				var testDate = new Date(d.getUTCFullYear()+'-01-01 00:00:00 UTC');
-				document.getElementById('debug').innerHTML += 'testDate = ' + testDate + '<br />';
+				var testDateString = d.getUTCFullYear()+'-01-01 00:00:00 UTC';
+				var testDate = new Date(testDateString);
+				document.getElementById('debug').innerHTML += 'testDate "'+testDateString+'" = ' + testDate + '<br />';
 				
 				var doy = 1 + Math.floor((d - startDate) / (1000 * 60 * 60 * 24));
 				
@@ -257,9 +259,12 @@
 				var d = new Date(document.getElementById('dateTimeInput').value+' UTC');
 				
 				if (d == 'Invalid Date' || d == 'NaN') { //use current time if no valid value entered
-					//console.log('initializing local datetime');
+					
+					document.getElementById('debug').innerHTML += 'entered datetime not recognized, using browser datetime<br />';
+					
 					var d = new Date(); //browser datetime in the timezone of the browser
-					//console.log(d);
+					outputUTCDateTime(d);
+
 					localGmtOffset = d.getTimezoneOffset()*60000;
 				}
 				
