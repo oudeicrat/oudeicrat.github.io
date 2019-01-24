@@ -223,7 +223,8 @@
 					userLat = Math.round(parseFloat(parsedUserLocation[1])*100)/100;
 					userLng = Math.round(parseFloat(parsedUserLocation[2])*100)/100;
 					
-					document.getElementById('latLongInput').value = (Math.round(userLat*100)/100) + ', ' + (Math.round(userLng*100)/100);
+					if (userLat != 'NaN' && userLng != 'NaN')
+						document.getElementById('latLongInput').value = (Math.round(userLat*100)/100) + ', ' + (Math.round(userLng*100)/100);
 				} else {
 					alert('unknown GPS format, use -12.34, 56.78');
 				}
@@ -240,8 +241,10 @@
 				outputUTCDateTime(d);
 
 				var sunPos = getSunPos(d);
-				document.getElementById('latLongOutput').value = Math.round(sunPos.lat*100)/100 + ', ' + Math.round(sunPos.lng*100)/100;
-				document.getElementById('zenAzOutput').value = Math.round(sunPos.zen*100)/100 + ', ' + Math.round(sunPos.az*100)/100;
+				if (sunPos.lat != 'NaN' && sunPos.lng != 'NaN')
+					document.getElementById('latLongOutput').value = Math.round(sunPos.lat*100)/100 + ', ' + Math.round(sunPos.lng*100)/100;
+				if (sunPos.zen != 'NaN' && sunPos.az != 'NaN')
+					document.getElementById('zenAzOutput').value = Math.round(sunPos.zen*100)/100 + ', ' + Math.round(sunPos.az*100)/100;
 				if (sunPos.zen > 100) { //sun below horizon (>90 + padding)
 					drawPointGps(sunPos.lat, sunPos.lng, '#000', 10);
 					//drawArrow(userLat, userLng, sunPos.az);
@@ -308,7 +311,8 @@
 			}
 			function load() {
 				navigator.geolocation.getCurrentPosition(function(position) {
-					document.getElementById('latLongInput').value = (Math.round(position.coords.latitude*100)/100) + ' ' + (Math.round(position.coords.longitude*100)/100);
+					if (position.coords.latitude != 'NaN' && position.coords.longitude != 'NaN') 
+						document.getElementById('latLongInput').value = (Math.round(position.coords.latitude*100)/100) + ' ' + (Math.round(position.coords.longitude*100)/100);
 					//console.log('calling redraw after geo success');
 					setTimeout('redraw();',10);
 				},function(){ //geolocation unavailable
@@ -348,7 +352,8 @@
 							if (x>=0.0) userLng = 90;
 							else userLng = -90;
 						}
-						document.getElementById('latLongInput').value = (Math.round(userLat*100)/100) + ', ' + (Math.round(userLng*100)/100);
+						if (userLat != 'NaN' && userLng != 'NaN')
+							document.getElementById('latLongInput').value = (Math.round(userLat*100)/100) + ', ' + (Math.round(userLng*100)/100);
 						//console.log('calling redraw after canvas click');
 						setTimeout('redraw();',10);
 					}
@@ -378,10 +383,10 @@
 				<input type="text" id="dateTimeInput" value="" style="width:130px" /><button onclick="setTimeout('redraw();',10);">UTC</button><br /><br />
 				Sun pos:<br />
 				<input type="text" id="latLongOutput" value="" readonly="readonly" style="width:105px" />
-				<a id="sunPosCheckLink" href="https://www.timeanddate.com/worldclock/sunearth.html">(check)</a><br /><br />
+				<a id="sunPosCheckLink" href="https://www.timeanddate.com/worldclock/sunearth.html" target="_blank">(check<img src="external.svg" width="10" height="10" />)</a><br /><br />
 				Zenith, azimuth:<br />
 				<input type="text" id="zenAzOutput" value="0.00, 0.00" readonly="readonly" style="width:105px" />
-				<a id="azimuthCheckLink" href="https://suncalc.org/">(check)</a><br /><br />
+				<a id="azimuthCheckLink" href="https://suncalc.org/" target="_blank">(check<img src="external.svg" width="10" height="10" />)</a><br /><br />
 				<b id="dayCaption" style="color:#c00;">Red arrow = which direction is the Sun visible on the sky</b>
 				<b id="nightCaption" style="display:none;">Black = the Sun is not visible</b>
 			</div>
