@@ -132,7 +132,7 @@
 			function getSunPos(d) {
 				//https://gist.github.com/jgomezdans/733741/
 				
-				var startDate = new Date(d.getUTCFullYear()+'-01-01 00:00:00 GMT');
+				var startDate = new Date(Date.UTC(d.getUTCFullYear(),0,1,0,0,0));
 				var doy = 1 + Math.floor((d - startDate) / (1000 * 60 * 60 * 24));
 				//console.log('doy = ',doy);
 				var h = d.getUTCHours() + d.getUTCMinutes()/60; //absolute value (not relative to observer)
