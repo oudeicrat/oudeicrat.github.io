@@ -227,6 +227,18 @@
 					+ String('0'+d.getUTCMinutes()).slice(-2); // + ':' + String('0'+d.getUTCSeconds()).slice(-2);
 			}
 
+			function updateAzimuthCheckLink(d, localGmtOffset) {
+				document.getElementById('debug').innerHTML += 'calculating relative local date from '+d.toUTCString()+' and localGmtOffset = '+localGmtOffset+'<br />';
+				
+				var localDate = new Date(d.getTime() + localGmtOffset);
+				
+				document.getElementById('debug').innerHTML += 'calculated relative local date: '+localDate.toUTCString()+', setting link URL<br />';
+
+				document.getElementById('azimuthCheckLink').href = 'https://www.suncalc.org/#/'
+					+ (Math.round(userLat*100)/100) + ',' + (Math.round(userLng*100)/100) + ',2/'
+					+ localDate.getUTCFullYear()+'.'+String('0'+(localDate.getUTCMonth()+1)).slice(-2)+'.'+String('0'+localDate.getUTCDate()).slice(-2)
+					+ '/' + String('0'+localDate.getUTCHours()).slice(-2) + ':' + String('0'+localDate.getUTCMinutes()).slice(-2) + '/1/0';
+			}
 			
 			function redraw() {
 				//console.log('redraw called');
@@ -324,7 +336,7 @@
 					Math.round(10*previousLat)/10 != Math.round(10*userLat)/10 || 
 					Math.round(10*previousLng)/10 != Math.round(10*userLng)/10
 				) {
-					
+					document.getElementById('azimuthCheckLink').href = 'https://www.suncalc.org/';
 					if (goingToRequest) {
 						clearTimeout(requestWaitTimeout);
 						goingToRequest = false;
@@ -341,16 +353,11 @@
 								if ('status' in jsonData && jsonData.status=='OK' && 'gmtOffset' in jsonData) {
 									localGmtOffset = jsonData.gmtOffset*1000; //eg. GMT+1 -> jsonData.gmtOffset = 3600
 									
-									var localDate = new Date(d.getTime() + localGmtOffset);
-				
-									document.getElementById('azimuthCheckLink').href = 'https://www.suncalc.org/#/'
-										+ (Math.round(userLat*100)/100) + ',' + (Math.round(userLng*100)/100) + ',2/'
-										+ localDate.getUTCFullYear()+'.'+String('0'+(localDate.getUTCMonth()+1)).slice(-2)+'.'+String('0'+localDate.getUTCDate()).slice(-2)
-										+ '/' + String('0'+localDate.getUTCHours()).slice(-2) + ':' + String('0'+localDate.getUTCMinutes()).slice(-2) + '/1/0';
-										
+									updateAzimuthCheckLink(d, localGmtOffset);
+									
 								} else {
 									//console.log('timezonedb.com request unsuccessful');
-									document.getElementById('azimuthCheckLink').href = 'https://www.suncalc.org/'; //sometimes timezone is not found (for example in the ocean)
+									//sometimes timezone is not found (for example in the ocean)
 								}
 							} else { alert('requesting timezonedb.com failed'); }
 							previousLat = userLat; previousLng = userLng;
@@ -363,7 +370,9 @@
 						xhr.send();
 						
 						
-					},1700);
+					},1200);
+				} else {
+					updateAzimuthCheckLink(d, localGmtOffset)
 				}
 			}
 			function load() {
