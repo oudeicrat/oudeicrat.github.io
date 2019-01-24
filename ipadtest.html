@@ -132,7 +132,7 @@
 			function getSunPos(d) {
 				//https://gist.github.com/jgomezdans/733741/
 				
-				var startDate = new Date(d.getFullYear()+'-01-01 GMT');
+				var startDate = new Date(d.getUTCFullYear()+'-01-01 00:00:00 GMT');
 				
 				document.getElementById('debug').innerHTML += 'startDate = ' + startDate + '<br />';
 				
