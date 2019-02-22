@@ -17,6 +17,15 @@
 			//http://answers.google.com/answers/threadview/id/782886.html
 			//https://gist.github.com/jgomezdans/733741/
 			
+			var animateTime = false;
+			var animateTimeout = null;
+			var animateTimeInterval = 2; //add 1 minute to reference UTC datetime
+			var animateTimePeriod = 50; //50ms framerate
+			
+			var showEquatorCheckpoints = false;
+			var showSouthCheckpoints = false;
+			var showNorthCheckpoints = false;
+			
 			var canvasSize;
 			var imgmapSize;
 			var userLat = 0.00;
@@ -92,15 +101,14 @@
 				ctx.fillText('N', Math.round(coord.x - Math.sin(rad(lng))*radius*2 - 4), Math.round(coord.y - Math.cos(rad(lng))*radius*2 + 6) );
 				
 			}
-			function drawArrow(lat,lng,az) {
+			function drawArrow(lat,lng,az,lineWidth,arrowSize,color,elongationPattern) {
 				var ctx = document.getElementById('canvasMap').getContext('2d');
 				coord = gpsToMapXY(lat,lng);
-				ctx.lineWidth = 3;
-				ctx.strokeStyle = '#f32';
+				ctx.lineWidth = lineWidth;
+				ctx.strokeStyle = color; //'#f32';
 				ctx.beginPath();
 				
-				var arrowSize = 50;
-				var arrowDirection = az - userLng; //because AZ is relative to observer
+				var arrowDirection = az - lng; //because AZ is relative to observer
 				
 				ctx.moveTo(coord.x, coord.y);
 				var arrowX = coord.x + Math.sin(rad(arrowDirection)) * arrowSize;
@@ -108,7 +116,7 @@
 				ctx.lineTo(arrowX, arrowY);
 				ctx.stroke();
 				
-				var arrowAngle = 10;
+				var arrowAngle = 12;
 				var arrowLength = Math.round(2*arrowSize / 3); 
 				
 				ctx.moveTo(arrowX, arrowY);
@@ -119,17 +127,21 @@
 				ctx.lineTo(coord.x + Math.sin(rad(arrowDirection-arrowAngle)) * arrowLength, coord.y - Math.cos(rad(arrowDirection-arrowAngle)) * arrowLength);
 				ctx.stroke();
 
-				ctx.lineWidth = 1;
-				ctx.moveTo(coord.x, coord.y);
-				arrowSize = imgmapSize; //TODO: limit to the edge of canvas
-				ctx.lineTo(coord.x + Math.sin(rad(arrowDirection)) * arrowSize, coord.y - Math.cos(rad(arrowDirection)) * arrowSize);
-				ctx.stroke();
+				if (elongationPattern!==false && elongationPattern!==null) {
+					ctx.setLineDash(elongationPattern);
+					ctx.lineWidth = 1;
+					ctx.moveTo(coord.x, coord.y);
+					arrowSize = imgmapSize; //TODO: limit to the edge of canvas
+					ctx.lineTo(coord.x + Math.sin(rad(arrowDirection)) * arrowSize, coord.y - Math.cos(rad(arrowDirection)) * arrowSize);
+					ctx.stroke();
+					ctx.setLineDash([]);
+				}
 			}
 			
 			
 			function rad(deg) { return deg * Math.PI / 180; } 
 			
-			function getSunPos(d) {
+			function getSunPos(d,observer) {
 				//https://gist.github.com/jgomezdans/733741/
 				
 				var startDate = new Date(Date.UTC(d.getUTCFullYear(),0,1,0,0,0));
@@ -150,7 +162,7 @@
 				var TC = 0.004297+0.107029*Math.cos(g)-1.837877*Math.sin(g) - 0.837378*Math.cos(2*g) - 2.340475*Math.sin(2*g);
 				//console.log('TC = ',TC);
 				//Solar Hour Angle relative to observer SHArto = (hour-12)*15 + Longitude + TC
-				var SHArto = (h-12)*15 + userLng + TC;  
+				var SHArto = (h-12)*15 + observer.lng + TC;  
 				if (SHArto > 180) {
 					SHArto = SHArto - 360;
 				} else if (SHArto < -180) {
@@ -169,7 +181,7 @@
 				
 				//zenith (relative to observer)
 				//cos(SZA) = sin(Latitude)*sin(Decl)+cos(Latitude)*cos(Decl)*cos(SHA)
-				var cosSZA = Math.sin(rad(userLat)) * Math.sin(rad(Decl)) + Math.cos(rad(userLat)) * Math.cos(rad(Decl)) * Math.cos(rad(SHArto));
+				var cosSZA = Math.sin(rad(observer.lat)) * Math.sin(rad(Decl)) + Math.cos(rad(observer.lat)) * Math.cos(rad(Decl)) * Math.cos(rad(SHArto));
  				if (cosSZA > 1.00) cosSZA = 1.00;
  				if (cosSZA < -1.00) cosSZA = -1.00;
  				//console.log('cosSZA = ',cosSZA);
@@ -180,7 +192,7 @@
    
 				//azimuth (relative to observer)
 				//cos(AZ) = (sin(Decl)-sin(Latitude)*cos(SZA))/(cos(Latitude)*sin(SZA))
-				var cosAZ = (Math.sin(rad(Decl)) - Math.sin(rad(userLat)) * Math.cos(SZArad)) / (Math.cos(rad(userLat)) * Math.sin(SZArad));
+				var cosAZ = (Math.sin(rad(Decl)) - Math.sin(rad(observer.lat)) * Math.cos(SZArad)) / (Math.cos(rad(observer.lat)) * Math.sin(SZArad));
  				if (cosAZ > 1.00) cosAZ = 1.00;
  				if (cosAZ < -1.00) cosAZ = -1.00;
  				//console.log('cosAZ = ',cosAZ);
@@ -209,7 +221,80 @@
 					+ '/' + String('0'+localDate.getUTCHours()).slice(-2) + ':' + String('0'+localDate.getUTCMinutes()).slice(-2) + '/1/0';
 			}
 			
+			
+			function showAltSunPos(d) {
+				var altPos = [
+					{'pos':{'lat':0.0,'lng':-150},'cat':0},
+					{'pos':{'lat':0.0,'lng':-120},'cat':0},
+					{'pos':{'lat':0.0,'lng':-90},'cat':0},
+					{'pos':{'lat':0.0,'lng':-60.0},'cat':0},
+					{'pos':{'lat':0.0,'lng':-30.0},'cat':0},
+					{'pos':{'lat':0.0,'lng':0.0},'cat':0},
+					{'pos':{'lat':0.0,'lng':30.0},'cat':0},
+					{'pos':{'lat':0.0,'lng':60.0},'cat':0},
+					{'pos':{'lat':0.0,'lng':90},'cat':0},
+					{'pos':{'lat':0.0,'lng':120.0},'cat':0},
+					{'pos':{'lat':0.0,'lng':150.0},'cat':0},
+					{'pos':{'lat':0.0,'lng':180},'cat':0},
+
+					{'pos':{'lat':-60.0,'lng':-150},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':-120},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':-90},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':-60.0},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':-30.0},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':0.0},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':30.0},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':60.0},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':90},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':120.0},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':150.0},'cat':-60},
+					{'pos':{'lat':-60.0,'lng':180},'cat':-60},
+					
+					{'pos':{'lat':60.0,'lng':-150},'cat':60},
+					{'pos':{'lat':60.0,'lng':-120},'cat':60},
+					{'pos':{'lat':60.0,'lng':-90},'cat':60},
+					{'pos':{'lat':60.0,'lng':-60.0},'cat':60},
+					{'pos':{'lat':60.0,'lng':-30.0},'cat':60},
+					{'pos':{'lat':60.0,'lng':0.0},'cat':60},
+					{'pos':{'lat':60.0,'lng':30.0},'cat':60},
+					{'pos':{'lat':60.0,'lng':60.0},'cat':60},
+					{'pos':{'lat':60.0,'lng':90},'cat':60},
+					{'pos':{'lat':60.0,'lng':120.0},'cat':60},
+					{'pos':{'lat':60.0,'lng':150.0},'cat':60},
+					{'pos':{'lat':60.0,'lng':180},'cat':60},
+					
+					//{'pos':{'lat':,'lng':},'cat':''},
+					//{'pos':{'lat':,'lng':},'cat':''},
+					//{'pos':{'lat':,'lng':},'cat':''},
+					//{'pos':{'lat':,'lng':},'cat':''},
+					//{'pos':{'lat':,'lng':},'cat':''},
+					//{'pos':{'lat':,'lng':},'cat':''},
+					//{'pos':{'lat':-31.95,'lng':115.86},'cat':'Perth'},
+					//{'pos':{'lat':40.72,'lng':-74.0},'cat':'New York'},
+					//{'pos':{'lat':51.51,'lng':-0.13},'cat':'London'}
+				];
+				for (var i in altPos) {
+					if (
+						(altPos[i].cat == 0 && showEquatorCheckpoints) ||
+						(altPos[i].cat == -60 && showSouthCheckpoints) ||
+						(altPos[i].cat == 60 && showNorthCheckpoints)
+					) {
+						var altSunPos = getSunPos(d,altPos[i].pos);
+						if (altSunPos.zen > 100) { //sun below horizon (>90 + padding)
+							//drawCompassGps(altPos[i].pos.lat, altPos[i].pos.lng, '#000', 8, 1);
+						} else { //sun above horizon
+							drawArrow(altPos[i].pos.lat, altPos[i].pos.lng, altSunPos.az, 1, 20, '#000', [2,10]);
+							//drawCompassGps(altPos[i].pos.lat, altPos[i].pos.lng, '#000', 8, 1);
+						}
+					}
+					
+				}
+
+			}
+			
+			
 			function redraw() {
+				if (animateTimeout!==null) clearTimeout(animateTimeout);
 				//console.log('redraw called');
 				previousWindowHeight = window.innerHeight;
 				previousWindowWidth = window.innerWidth;
@@ -269,31 +354,32 @@
 				if (d === null || d == 'Invalid Date' || d == 'NaN') { //use current time if no valid value entered
 				
 					var d = new Date(); //browser datetime in the timezone of the browser
-					outputUTCDateTime(d);
+					//outputUTCDateTime(d);
 					
 					localGmtOffset = d.getTimezoneOffset()*60000;
 				}
 				
 				outputUTCDateTime(d);
 
-				var sunPos = getSunPos(d);
+				var sunPos = getSunPos(d,{'lat':userLat,'lng':userLng});
 				if (sunPos.lat != 'NaN' && sunPos.lng != 'NaN')
 					document.getElementById('latLongOutput').value = Math.round(sunPos.lat*100)/100 + ', ' + Math.round(sunPos.lng*100)/100;
 				if (sunPos.zen != 'NaN' && sunPos.az != 'NaN')
 					document.getElementById('zenAzOutput').value = Math.round(sunPos.zen*100)/100 + ', ' + Math.round(sunPos.az*100)/100;
 				if (sunPos.zen > 100) { //sun below horizon (>90 + padding)
 					drawPointGps(sunPos.lat, sunPos.lng, '#000', 10);
-					//drawArrow(userLat, userLng, sunPos.az);
 					drawCompassGps(userLat, userLng, '#000', 13, 2);
 					document.getElementById('dayCaption').style.display = 'none';
 					document.getElementById('nightCaption').style.display = 'inline';
 				} else { //sun above horizon
 					drawPointGps(sunPos.lat, sunPos.lng, '#ff0', 10);
-					drawArrow(userLat, userLng, sunPos.az);
+					drawArrow(userLat, userLng, sunPos.az, 3, 50, '#f32', [8,4]);
 					drawCompassGps(userLat, userLng, '#000', 13, 2);
 					document.getElementById('dayCaption').style.display = 'inline';
 					document.getElementById('nightCaption').style.display = 'none';
 				}
+				
+				showAltSunPos(d);
 				
 				document.getElementById('sunPosCheckLink').href = 'https://www.timeanddate.com/worldclock/sunearth.html?month='
 					+ (d.getUTCMonth()+1) + '&day=' + d.getUTCDate() + '&year=' + d.getUTCFullYear() + '&hour='
@@ -341,7 +427,16 @@
 				} else {
 					updateAzimuthCheckLink(d, localGmtOffset)
 				}
-			}
+				
+				if (animateTime) {
+					d = new Date(d.getTime() + animateTimeInterval*60000); //add animateTimeInterval minutes
+					outputUTCDateTime(d);
+					if (animateTimeout!==null) clearTimeout(animateTimeout);
+					animateTimeout = setTimeout('redraw();',animateTimePeriod);
+				}
+			} //redraw
+			
+			
 			function load() {
 				navigator.geolocation.getCurrentPosition(function(position) {
 					if (position.coords.latitude != 'NaN' && position.coords.longitude != 'NaN') 
@@ -353,6 +448,20 @@
 					//console.log('calling redraw after geo fail');
 					setTimeout('redraw();',10); 
 				});
+				
+				document.getElementById('animateCheckbox').addEventListener('change', function(event) {
+					if (animateTime) {
+						animateTime = false;
+						if (animateTimeout!==null) {
+							clearTimeout(animateTimeout);
+							animateTimeout = null;
+						}
+					} else {
+						animateTime = true;
+						if (animateTimeout!==null) clearTimeout(animateTimeout);
+						animateTimeout = setTimeout('redraw();',animateTimePeriod);
+					}
+				}); 
 				
 				document.getElementById('latLongInput').addEventListener('keyup', function(event) {
 					event.preventDefault();
@@ -411,9 +520,17 @@
 			<div id="canvasDiv" style="float:left; padding:0px; margin:0px;"><canvas id="canvasMap"></canvas></div>
 			<div id="controlsDiv" style="float:right; padding:0px; margin:0px; width:200px;">
 				Observer location:<br />
-				<input type="text" id="latLongInput" value="0.00, 0.00" style="width:105px" /><button onclick="setTimeout('redraw();',10);">GO</button><br /><br />
+				<input type="text" id="latLongInput" value="0.00, 0.00" style="width:105px" /><button onclick="setTimeout('redraw();',10);">GO</button><br />
+				<input type="checkbox" id="equatorCheckpoints" onchange="showEquatorCheckpoints = !showEquatorCheckpoints;
+				if (!animateTime) redraw();" /><label for="equatorCheckpoints"> Equator Checkpoints</label><br />
+				<input type="checkbox" id="northCheckpoints" onchange="showNorthCheckpoints = !showNorthCheckpoints;
+				if (!animateTime) redraw();" /><label for="northCheckpoints"> North Checkpoints</label><br />
+				<input type="checkbox" id="southCheckpoints" onchange="showSouthCheckpoints = !showSouthCheckpoints;
+				if (!animateTime) redraw();" /><label for="southCheckpoints"> South Checkpoints</label><br />
+				<br />
 				Greenwich London time:<br />
-				<input type="text" id="dateTimeInput" value="" style="width:110px" /><button onclick="setTimeout('redraw();',10);">UTC</button><br /><br />
+				<input type="text" id="dateTimeInput" value="" style="width:110px" /><button onclick="setTimeout('redraw();',10);">UTC</button><br />
+				<input type="checkbox" id="animateCheckbox" /><label for="animateCheckbox"> Animate</label><br /><br />
 				Sun pos:<br />
 				<input type="text" id="latLongOutput" value="" readonly="readonly" style="width:105px" />
 				<a id="sunPosCheckLink" href="https://www.timeanddate.com/worldclock/sunearth.html" target="_blank">(check<img src="external.svg" width="10" height="10" />)</a><br /><br />
@@ -421,7 +538,7 @@
 				<input type="text" id="zenAzOutput" value="0.00, 0.00" readonly="readonly" style="width:105px" />
 				<a id="azimuthCheckLink" href="https://suncalc.org/" target="_blank">(check<img src="external.svg" width="10" height="10" />)</a><br /><br />
 				<b id="dayCaption" style="color:#c00;">Red arrow = which direction is the Sun visible on the sky</b>
-				<b id="nightCaption" style="display:none;">Black = the Sun is not visible</b><br /><br />
+				<b id="nightCaption" style="display:none;">The Sun is not visible from observer location</b><br /><br />
 				<a href="https://www.metabunk.org/direction-to-sun-vs-sun-position-above-the-ae-map-visualization.t10401/">metabunk discussion thread</a><br /><br />
 				<div id="debug"></div>
 			</div>
