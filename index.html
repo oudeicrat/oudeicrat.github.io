@@ -27,7 +27,6 @@
 			var showNorthCheckpoints = false;
 			
 			var canvasSize;
-			var imgmapSize;
 			var userLat = 0.00;
 			var userLng = 0.00;
 			var previousLat = 0.00;
@@ -42,21 +41,35 @@
 			function drawMap() {
 				var ctx = document.getElementById('canvasMap').getContext('2d');
 				var imageObj = document.getElementById('mapimg');
-				canvasSize = window.innerHeight-6;
-				if (window.innerWidth < canvasSize) canvasSize = window.innerWidth-6;
-				document.getElementById('mainContainer').style.width = (200+canvasSize)+'px';
-				document.getElementById('canvasDiv').style.width = canvasSize+'px';
 				
-				ctx.canvas.width = canvasSize;
-				ctx.canvas.height = canvasSize;
-				imgmapSize = canvasSize;
-				ctx.drawImage(imageObj, 0, 0,imgmapSize,imgmapSize);
+				ctx.globalAlpha = 0.5;
+				ctx.drawImage(imageObj, 0, 0,canvasSize,canvasSize);
+				ctx.globalAlpha = 1;
 			}
 			
 			function gpsToMapXY(lat,lng) {
-				var y = Math.round(imgmapSize/2+(90-lat)/360*imgmapSize*Math.cos(-lng/180*Math.PI));
-				var x = Math.round(imgmapSize/2+(lat-90)/360*imgmapSize*Math.sin(-lng/180*Math.PI));
+				var y = Math.round(canvasSize/2+(90-lat)/360*canvasSize*Math.cos(-lng/180*Math.PI));
+				var x = Math.round(canvasSize/2+(lat-90)/360*canvasSize*Math.sin(-lng/180*Math.PI));
 				return {x,y};
+			}
+			function xyToGps(x,y) {
+				var rx = 2.0*x / canvasSize - 1.0;
+				var ry = 2.0*y / canvasSize - 1.0;
+				var r = Math.sqrt(rx*rx + ry*ry);
+				if (r > 0.99) return false;
+
+				var lat = 90-180*r;
+				var lng = 0;
+				if (ry > 0.0) {
+					lng = 180*Math.atan(rx/ry)/Math.PI;
+				} else if (ry < 0.0) {
+					if (rx>=0.0) lng = 180-180*Math.atan(rx/(-ry))/Math.PI;
+					else lng = -180-180*Math.atan(rx/(-ry))/Math.PI;
+				} else {
+					if (rx>=0.0) lng = 90;
+					else lng = -90;
+				}
+				return {'lat':lat,'lng':lng};
 			}
 			function drawPointGps(lat,lng,color,radius) {
 				var ctx = document.getElementById('canvasMap').getContext('2d');
@@ -74,7 +87,7 @@
 				ctx.strokeStyle = '#ccc';
 				
 				ctx.moveTo(coord.x, coord.y);
-				ctx.lineTo(Math.round(imgmapSize/2),Math.round(imgmapSize/2));
+				ctx.lineTo(Math.round(canvasSize/2),Math.round(canvasSize/2));
 				ctx.stroke();
 
 				ctx.beginPath();
@@ -131,7 +144,7 @@
 					ctx.setLineDash(elongationPattern);
 					ctx.lineWidth = 1;
 					ctx.moveTo(coord.x, coord.y);
-					arrowSize = imgmapSize; //TODO: limit to the edge of canvas
+					arrowSize = canvasSize; //TODO: limit to the edge of canvas
 					ctx.lineTo(coord.x + Math.sin(rad(arrowDirection)) * arrowSize, coord.y - Math.cos(rad(arrowDirection)) * arrowSize);
 					ctx.stroke();
 					ctx.setLineDash([]);
@@ -140,6 +153,23 @@
 			
 			
 			function rad(deg) { return deg * Math.PI / 180; } 
+			
+			function isSunVisible(observer,htcOffset,sinDecl,cosDecl) {
+				//htcOffset = (h-12)*15 + TC
+				//sinDecl = Math.sin(rad(Decl));
+				//cosDecl = Math.cos(rad(Decl));
+				var SHArto = htcOffset + observer.lng;  
+				if (SHArto > 180) {
+					SHArto = SHArto - 360;
+				} else if (SHArto < -180) {
+					SHArto = SHArto + 360;
+				}
+				
+				var cosSZA = Math.sin(rad(observer.lat)) * sinDecl + Math.cos(rad(observer.lat)) * cosDecl * Math.cos(rad(SHArto));
+				//cosSZA < 0 = sun is below horizon
+				//cosSZA > 0 = sun is visible above horizon
+				return cosSZA;
+			}
 			
 			function getSunPos(d,observer) {
 				//https://gist.github.com/jgomezdans/733741/
@@ -162,7 +192,8 @@
 				var TC = 0.004297+0.107029*Math.cos(g)-1.837877*Math.sin(g) - 0.837378*Math.cos(2*g) - 2.340475*Math.sin(2*g);
 				//console.log('TC = ',TC);
 				//Solar Hour Angle relative to observer SHArto = (hour-12)*15 + Longitude + TC
-				var SHArto = (h-12)*15 + observer.lng + TC;  
+				var htcOffset = (h-12)*15 + TC;
+				var SHArto = htcOffset + observer.lng;  
 				if (SHArto > 180) {
 					SHArto = SHArto - 360;
 				} else if (SHArto < -180) {
@@ -181,13 +212,16 @@
 				
 				//zenith (relative to observer)
 				//cos(SZA) = sin(Latitude)*sin(Decl)+cos(Latitude)*cos(Decl)*cos(SHA)
-				var cosSZA = Math.sin(rad(observer.lat)) * Math.sin(rad(Decl)) + Math.cos(rad(observer.lat)) * Math.cos(rad(Decl)) * Math.cos(rad(SHArto));
+				var sinDecl = Math.sin(rad(Decl));
+				var cosDecl = Math.cos(rad(Decl));
+				var cosSZA = Math.sin(rad(observer.lat)) * sinDecl + Math.cos(rad(observer.lat)) * cosDecl * Math.cos(rad(SHArto));
+				//cosSZA < 0 = sun is below horizon
  				if (cosSZA > 1.00) cosSZA = 1.00;
  				if (cosSZA < -1.00) cosSZA = -1.00;
  				//console.log('cosSZA = ',cosSZA);
  				var SZArad = Math.acos(cosSZA);
  				//console.log('SZArad = ',SZArad);
- 				var SZA = SZArad * 180 / Math.PI;
+ 				var SZA = SZArad * 180 / Math.PI; //zenith>90 = sun is below horizon
  				//console.log('SZA = ',SZA);
    
 				//azimuth (relative to observer)
@@ -200,7 +234,7 @@
 				if (SHArto>0) AZ = 360 - AZ; //https://en.wikipedia.org/wiki/Solar_azimuth_angle#Formulas "...between 180 and 360 degrees when the hour angle is positive (afternoon)"
 				//console.log('AZ = ',AZ);
 				
-				return {'lat':Decl, 'lng':SHAa, 'az':AZ, 'zen':SZA }; //lat,lng = absolute; az,zen = relative to observer  
+				return {'lat':Decl, 'lng':SHAa, 'az':AZ, 'zen':SZA, 'htcOffset':htcOffset, 'sinDecl':sinDecl, 'cosDecl':cosDecl }; //lat,lng = absolute; az,zen = relative to observer  
 			}
 			
 			//compare to: https://www.timeanddate.com/worldclock/sunearth.html
@@ -292,6 +326,44 @@
 
 			}
 			
+			function drawNight(htcOffset, sinDecl, cosDecl) {
+				//isSunVisible(testPosition, htcOffset, sinDecl, cosDecl);
+				var ctx = document.getElementById('canvasMap').getContext('2d');
+				
+				canvasRadius = canvasSize/2;
+				canvasRadiusSquared = canvasSize*canvasSize/4;
+				var tileSize = 6;
+				var halfTileSize = 3;
+				var visibility = -1;
+				var pos = false;
+				var drawNightSegment = false;
+				
+				for (var x=0; x<canvasSize; x+=tileSize) {
+					for (var y=0; y<canvasSize; y+=tileSize) {
+						pos = xyToGps(x,y);
+						if (pos !== false) {
+							visibility = isSunVisible(pos, htcOffset, sinDecl, cosDecl);
+							drawNightSegment = true;
+							ctx.globalAlpha = 1;
+							if (visibility > 0.1) {
+								drawNightSegment = false;
+							} else if (visibility > -0.3) {
+								ctx.globalAlpha = 1-(visibility+0.3)*2.5;
+							}
+							
+							if (drawNightSegment) {
+								ctx.fillStyle = '#000';
+								ctx.beginPath();
+								ctx.rect(x-halfTileSize, y-halfTileSize, tileSize, tileSize);
+								ctx.fill();
+							}
+						}
+					}
+				}
+				ctx.globalAlpha = 1;
+			}
+
+			
 			
 			function redraw() {
 				if (animateTimeout!==null) clearTimeout(animateTimeout);
@@ -299,7 +371,14 @@
 				previousWindowHeight = window.innerHeight;
 				previousWindowWidth = window.innerWidth;
 				
-				drawMap();
+				canvasSize = window.innerHeight-6;
+				if (window.innerWidth < canvasSize) canvasSize = window.innerWidth-6;
+				document.getElementById('mainContainer').style.width = (200+canvasSize)+'px';
+				document.getElementById('canvasDiv').style.width = canvasSize+'px';
+				var ctx = document.getElementById('canvasMap').getContext('2d');
+				ctx.canvas.width = canvasSize;
+				ctx.canvas.height = canvasSize;
+				
 				var parsedUserLocation = /^(-?[0-9]+(?:.[0-9]+)?)[\s,;]+(-?[0-9]+(?:.[0-9]+)?)$/.exec(document.getElementById('latLongInput').value);
 				if (
 					//typeof parsedUserLocation != 'null' &&
@@ -362,6 +441,10 @@
 				outputUTCDateTime(d);
 
 				var sunPos = getSunPos(d,{'lat':userLat,'lng':userLng});
+				
+				drawNight(sunPos.htcOffset, sunPos.sinDecl, sunPos.cosDecl);
+				drawMap();
+				
 				if (sunPos.lat != 'NaN' && sunPos.lng != 'NaN')
 					document.getElementById('latLongOutput').value = Math.round(sunPos.lat*100)/100 + ', ' + Math.round(sunPos.lng*100)/100;
 				if (sunPos.zen != 'NaN' && sunPos.az != 'NaN')
@@ -438,6 +521,8 @@
 			
 			
 			function load() {
+				canvasSize = window.innerHeight-6;
+				
 				navigator.geolocation.getCurrentPosition(function(position) {
 					if (position.coords.latitude != 'NaN' && position.coords.longitude != 'NaN') 
 						document.getElementById('latLongInput').value = (Math.round(position.coords.latitude*100)/100) + ' ' + (Math.round(position.coords.longitude*100)/100);
@@ -479,11 +564,19 @@
 				});	
 				
 				document.getElementById('canvasMap').addEventListener('click', function(event) { //mousedown
-					var x = 2*event.clientX / imgmapSize - 1;
-					var y = 2*event.clientY / imgmapSize - 1;
+					var userPos = xyToGps(event.clientX, event.clientY);
+					if (userPos !== false) {
+						userLat = userPos.lat;
+						userLng = userPos.lng;
+						document.getElementById('latLongInput').value = (Math.round(userLat*100)/100) + ', ' + (Math.round(userLng*100)/100);
+						setTimeout('redraw();',10);
+					}
+					/*
+					var x = 2*event.clientX / canvasSize - 1;
+					var y = 2*event.clientY / canvasSize - 1;
 					var r = Math.sqrt(x*x + y*y);
-					//console.log('click r = '+r);
 					if (r < 0.99) {
+					
 						userLat = 90-180*r;
 						if (y > 0.0) {
 							userLng = 180*Math.atan(x/y)/Math.PI;
@@ -496,9 +589,8 @@
 						}
 						if (userLat != 'NaN' && userLng != 'NaN')
 							document.getElementById('latLongInput').value = (Math.round(userLat*100)/100) + ', ' + (Math.round(userLng*100)/100);
-						//console.log('calling redraw after canvas click');
 						setTimeout('redraw();',10);
-					}
+					}*/
 				}, false);
 			}
 			var previousWindowHeight = 0;
