@@ -35,7 +35,8 @@
 			var minutesOffset = 0;
 			var declination = 0;
 			var goingToRequest = false;
-			var requestWaitTimeout = null; 
+			var requestWaitTimeout = null;
+			var year = 2019; 
 
 
 			function drawMap() {
@@ -174,7 +175,8 @@
 			function getSunPos(d,observer) {
 				//https://gist.github.com/jgomezdans/733741/
 				
-				var startDate = new Date(Date.UTC(d.getUTCFullYear(),0,1,0,0,0));
+				year = d.getUTCFullYear();
+				var startDate = new Date(Date.UTC(year,0,1,0,0,0));
 				var doy = 1 + Math.floor((d - startDate) / (1000 * 60 * 60 * 24));
 				//console.log('doy = ',doy);
 				var h = d.getUTCHours() + d.getUTCMinutes()/60; //absolute value (not relative to observer)
@@ -241,7 +243,8 @@
 			
 			
 			function outputUTCDateTime(d) {
-				document.getElementById('dateTimeInput').value = d.getUTCFullYear() + '-' + String('0'+(d.getUTCMonth()+1)).slice(-2)
+				year = d.getUTCFullYear();
+				document.getElementById('dateTimeInput').value = year + '-' + String('0'+(d.getUTCMonth()+1)).slice(-2)
 					+ '-' + String('0'+d.getUTCDate()).slice(-2) + ' ' + String('0'+d.getUTCHours()).slice(-2) + ':' 
 					+ String('0'+d.getUTCMinutes()).slice(-2); // + ':' + String('0'+d.getUTCSeconds()).slice(-2);
 			}
@@ -347,8 +350,15 @@
 							ctx.globalAlpha = 1;
 							if (visibility > 0.1) {
 								drawNightSegment = false;
-							} else if (visibility > -0.3) {
-								ctx.globalAlpha = 1-(visibility+0.3)*2.5;
+								//if (visibility > 0.85) {
+								//	ctx.globalAlpha = (visibility-0.84)*2;
+								//	ctx.fillStyle = '#ff0';
+								//	ctx.beginPath();
+								//	ctx.rect(x-halfTileSize, y-halfTileSize, tileSize, tileSize);
+								//	ctx.fill();
+								//}
+							} else if (visibility > -0.2) {
+								ctx.globalAlpha = 1-(visibility+0.2)*3.33;
 							}
 							
 							if (drawNightSegment) {
@@ -450,7 +460,7 @@
 				if (sunPos.zen != 'NaN' && sunPos.az != 'NaN')
 					document.getElementById('zenAzOutput').value = Math.round(sunPos.zen*100)/100 + ', ' + Math.round(sunPos.az*100)/100;
 				if (sunPos.zen > 100) { //sun below horizon (>90 + padding)
-					drawPointGps(sunPos.lat, sunPos.lng, '#000', 10);
+					drawPointGps(sunPos.lat, sunPos.lng, '#ff0', 10);
 					drawCompassGps(userLat, userLng, '#000', 13, 2);
 					document.getElementById('dayCaption').style.display = 'none';
 					document.getElementById('nightCaption').style.display = 'inline';
@@ -519,6 +529,26 @@
 				}
 			} //redraw
 			
+			function setMarchEquinox() {
+				document.getElementById('dateTimeInput').value = year+'-03-20 03:00';
+				setTimeout('redraw();',10);
+				return false;
+			}
+			function setJuneSolstice() {
+				document.getElementById('dateTimeInput').value = year+'-06-20 20:00';
+				setTimeout('redraw();',10);
+				return false;
+			}
+			function setSeptemberEquinox() {
+				document.getElementById('dateTimeInput').value = year+'-09-22 05:00';
+				setTimeout('redraw();',10);
+				return false;
+			}
+			function setDecemberSolstice() {
+				document.getElementById('dateTimeInput').value = year+'-12-21 05:00';
+				setTimeout('redraw();',10);
+				return false;
+			}
 			
 			function load() {
 				canvasSize = window.innerHeight-6;
@@ -620,8 +650,12 @@
 				<input type="checkbox" id="southCheckpoints" onchange="showSouthCheckpoints = !showSouthCheckpoints;
 				if (!animateTime) redraw();" /><label for="southCheckpoints"> South Checkpoints</label><br />
 				<br />
-				Greenwich London time:<br />
-				<input type="text" id="dateTimeInput" value="" style="width:110px" /><button onclick="setTimeout('redraw();',10);">UTC</button><br />
+				Greenwich London time (UTC)<br />
+				<input type="text" id="dateTimeInput" value="" style="width:110px" /><button onclick="setTimeout('redraw();',10);">set</button><br />
+				<a href="#" onclick="return setMarchEquinox();">March equinox</a><br />
+				<a href="#" onclick="return setJuneSolstice();">June solstice</a><br />
+				<a href="#" onclick="return setSeptemberEquinox();">September equinox</a><br />
+				<a href="#" onclick="return setDecemberSolstice();">December solstice</a><br />
 				<input type="checkbox" id="animateCheckbox" /><label for="animateCheckbox"> Animate</label><br /><br />
 				Sun pos:<br />
 				<input type="text" id="latLongOutput" value="" readonly="readonly" style="width:105px" />
