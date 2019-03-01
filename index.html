@@ -27,6 +27,10 @@
 			var showNorthCheckpoints = false;
 			
 			var canvasSize;
+			var canvasSizeReciprocal;
+			var m180divPI = 180/Math.PI;
+			var rec180 = 1/180;
+			
 			var userLat = 0.00;
 			var userLng = 0.00;
 			var previousLat = 0.00;
@@ -54,18 +58,18 @@
 				return {x,y};
 			}
 			function xyToGps(x,y) {
-				var rx = 2.0*x / canvasSize - 1.0;
-				var ry = 2.0*y / canvasSize - 1.0;
+				var rx = 2.0*x * canvasSizeReciprocal - 1.0;
+				var ry = 2.0*y * canvasSizeReciprocal - 1.0;
 				var r = Math.sqrt(rx*rx + ry*ry);
 				if (r > 0.99) return false;
 
 				var lat = 90-180*r;
 				var lng = 0;
 				if (ry > 0.0) {
-					lng = 180*Math.atan(rx/ry)/Math.PI;
+					lng = Math.atan(rx/ry) * m180divPI;
 				} else if (ry < 0.0) {
-					if (rx>=0.0) lng = 180-180*Math.atan(rx/(-ry))/Math.PI;
-					else lng = -180-180*Math.atan(rx/(-ry))/Math.PI;
+					if (rx>=0.0) lng = 180 - Math.atan(rx/(-ry)) * m180divPI;
+					else lng = -180 - Math.atan(rx/(-ry)) * m180divPI;
 				} else {
 					if (rx>=0.0) lng = 90;
 					else lng = -90;
@@ -153,7 +157,7 @@
 			}
 			
 			
-			function rad(deg) { return deg * Math.PI / 180; } 
+			function rad(deg) { return deg * Math.PI * rec180; } 
 			
 			function isSunVisible(observer,htcOffset,sinDecl,cosDecl) {
 				//htcOffset = (h-12)*15 + TC
@@ -223,7 +227,7 @@
  				//console.log('cosSZA = ',cosSZA);
  				var SZArad = Math.acos(cosSZA);
  				//console.log('SZArad = ',SZArad);
- 				var SZA = SZArad * 180 / Math.PI; //zenith>90 = sun is below horizon
+ 				var SZA = SZArad * m180divPI; //zenith>90 = sun is below horizon
  				//console.log('SZA = ',SZA);
    
 				//azimuth (relative to observer)
@@ -232,7 +236,7 @@
  				if (cosAZ > 1.00) cosAZ = 1.00;
  				if (cosAZ < -1.00) cosAZ = -1.00;
  				//console.log('cosAZ = ',cosAZ);
-				var AZ = Math.acos(cosAZ) * 180 / Math.PI;
+				var AZ = Math.acos(cosAZ) * m180divPI;
 				if (SHArto>0) AZ = 360 - AZ; //https://en.wikipedia.org/wiki/Solar_azimuth_angle#Formulas "...between 180 and 360 degrees when the hour angle is positive (afternoon)"
 				//console.log('AZ = ',AZ);
 				
@@ -382,6 +386,7 @@
 				previousWindowWidth = window.innerWidth;
 				
 				canvasSize = window.innerHeight-6;
+				canvasSizeReciprocal = 1/canvasSize;
 				if (window.innerWidth < canvasSize) canvasSize = window.innerWidth-6;
 				document.getElementById('mainContainer').style.width = (200+canvasSize)+'px';
 				document.getElementById('canvasDiv').style.width = canvasSize+'px';
