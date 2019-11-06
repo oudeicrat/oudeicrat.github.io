@@ -19,7 +19,7 @@
 			
 			var animateTime = false;
 			var animateTimeout = null;
-			var animateTimeInterval = 2; //add 1 minute to reference UTC datetime
+			var animateTimeInterval = 2; //add 2 minutes to reference UTC datetime
 			var animateTimePeriod = 50; //50ms framerate
 			
 			var showEquatorCheckpoints = false;
@@ -40,7 +40,7 @@
 			var declination = 0;
 			var goingToRequest = false;
 			var requestWaitTimeout = null;
-			var year = 2019; 
+			var year = new Date().getFullYear(); 
 
 
 			function drawMap() {
@@ -554,6 +554,12 @@
 				setTimeout('redraw();',10);
 				return false;
 			}
+			function setMonth(monthNumber) {
+				if (monthNumber < 10) monthNumber = '0'+monthNumber;
+				document.getElementById('dateTimeInput').value = document.getElementById('dateTimeInput').value.replace(/^([0-9]+[-])[0-9]+([-].+)$/,'$1'+monthNumber+'$2');
+				setTimeout('redraw();',10);
+				return false;
+			}
 			
 			function load() {
 				canvasSize = window.innerHeight-6;
@@ -657,9 +663,21 @@
 				<br />
 				Greenwich London time (UTC)<br />
 				<input type="text" id="dateTimeInput" value="" style="width:110px" /><button onclick="setTimeout('redraw();',10);">set</button><br />
+				<a href="#" onclick="return setMonth(1);">January</a><br />
+				<a href="#" onclick="return setMonth(2);">February</a><br />
+				<a href="#" onclick="return setMonth(3);">March</a><br />
 				<a href="#" onclick="return setMarchEquinox();">March equinox</a><br />
+				<a href="#" onclick="return setMonth(4);">April</a><br />
+				<a href="#" onclick="return setMonth(5);">May</a><br />
+				<a href="#" onclick="return setMonth(6);">June</a><br />
 				<a href="#" onclick="return setJuneSolstice();">June solstice</a><br />
+				<a href="#" onclick="return setMonth(7);">July</a><br />
+				<a href="#" onclick="return setMonth(8);">August</a><br />
+				<a href="#" onclick="return setMonth(9);">September</a><br />
 				<a href="#" onclick="return setSeptemberEquinox();">September equinox</a><br />
+				<a href="#" onclick="return setMonth(10);">October</a><br />
+				<a href="#" onclick="return setMonth(11);">November</a><br />
+				<a href="#" onclick="return setMonth(12);">December</a><br />
 				<a href="#" onclick="return setDecemberSolstice();">December solstice</a><br />
 				<input type="checkbox" id="animateCheckbox" /><label for="animateCheckbox"> Animate</label><br /><br />
 				Sun pos:<br />
