@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv=Content-Type content="text/html; charset=utf-8">
+		<title>Trigonometry</title>
+		<style type="text/css">
+			body { font-family:Arial; font-size:12px; margin:0px; padding:0px; }
+			input { font-family:Arial; font-size:12px; }
+			button { font-family:Arial; font-size:12px; }
+		</style>
+		<script type="text/javascript">
+
+			var canvasSize;
+			var canvasSizeReciprocal;
+			var m180divPI = 180/Math.PI;
+			var rec180 = 1/180;
+			function rad(deg) { return deg * Math.PI * rec180; }
+			var rad90 = rad(90);
+
+			var lat = 50.00;
+
+
+			function drawTriangle(angle,adjacent) {
+				var scale = 16;
+				var offset = 20;
+				var ctx = document.getElementById('canvas').getContext('2d');
+				var opposite = Math.tan(rad(angle))*adjacent;
+				var canvasHeight = Math.round(opposite/scale+offset*2+2);
+				var canvasWidth = Math.round(adjacent/scale+offset*2+60);
+				ctx.canvas.width = canvasWidth;
+				ctx.canvas.height = canvasHeight;
+
+				ctx.lineWidth = 3;
+				ctx.strokeStyle = '#000';
+				ctx.beginPath();
+				//ctx.moveTo(offset,canvasHeight-offset);
+				ctx.moveTo(offset+adjacent/scale, canvasHeight-offset-opposite/scale);
+				ctx.lineTo(offset,canvasHeight-offset);
+				ctx.lineTo(offset+adjacent/scale, canvasHeight-offset);
+				ctx.stroke();
+				ctx.font = 'bold 20px Arial';
+				ctx.fillStyle = '#000';
+				ctx.fillText(Math.round(adjacent*10)/10, adjacent/(2*scale)-(90-angle)/5, canvasHeight-1);
+				ctx.fillStyle = '#153';
+				var angleOffset = 1+20/Math.tan(rad(angle));
+				if (angleOffset > canvasWidth*0.7) angleOffset = canvasWidth*0.7;
+				ctx.fillText((Math.round(angle*10)/10)+'°', offset+angleOffset, canvasHeight-offset-3);
+
+
+				ctx.strokeStyle = '#d00';
+				ctx.beginPath();
+				ctx.moveTo(offset+adjacent/scale, canvasHeight-offset);
+				ctx.lineTo(offset+adjacent/scale, canvasHeight-offset-opposite/scale);
+				ctx.stroke();
+				ctx.font = 'bold 20px Arial';
+				ctx.fillStyle = '#d00';
+				ctx.fillText('x', offset+adjacent/scale+6, canvasHeight-offset-opposite/(2*scale)+6);
+
+
+			}
+
+			var angleStepApprox = 0.0001; //configured numerical accuracy in radians
+			var maxErrorDistance = 10005; //if calculator exceedes this value there must have been an error
+			function calculateDistance(lat) {
+				var latRad = rad(lat);
+
+				var b = 6356.75231; //polar radius in km (WGS‐84)
+				var a = 6378.137; //equatorial radius in km (WGS‐84)
+				var aDivB = a/b;
+				//ellipse: x=a*cos(t), y=b*sin(t), t=arctan((a/b)*tan(angle))
+				var numericalSteps = Math.round((rad90-latRad) / angleStepApprox);
+				if (numericalSteps<2) numericalSteps = 2;
+				var angleStep = (rad90-latRad) / numericalSteps;
+				if (angleStep < angleStepApprox/10) angleStep = angleStepApprox/10;
+
+				//console.log('------------------------------------');
+				//console.log('step = ',angleStep);
+
+				var lastAngle = rad90;
+				var lastT = Math.atan(Math.tan(lastAngle)*aDivB);
+				var lastX = a*Math.cos(lastT);
+				var lastY = b*Math.sin(lastT);
+				var newAngle,newT,newX,newY;
+				var d = 0;
+				var counter = 0;
+				while (lastAngle > latRad && d<maxErrorDistance && counter<numericalSteps+3) {
+					newAngle = lastAngle - angleStep;
+					if (newAngle < latRad) newAngle = latRad;
+					newT = Math.atan(Math.tan(newAngle)*aDivB);
+					newX = a*Math.cos(newT);
+					newY = b*Math.sin(newT);
+					d += Math.sqrt((newX-lastX)*(newX-lastX)+(newY-lastY)*(newY-lastY));
+					var lastT = newT;
+					var lastX = newX;
+					var lastY = newY;
+					lastAngle = newAngle;
+					counter++;
+				}
+				if (d>=maxErrorDistance || counter>=numericalSteps+3) alert('error, angleStep='+angleStep+', lastAngle='+lastAngle+', d='+d+', counter='+counter);
+				return d;
+				//document.getElementById('debug').innerText = d;
+				//console.log(angleStepApprox,d,numericalSteps);
+
+				/* * /
+				console.log('steps = ',numericalSteps,' cnt = ',counter,' angle overshoot = ',lastAngle-latRad);
+				console.log('numerical d = ',d);
+				var r = (a+b+(b-a)*lat/90)/2;
+				console.log('avg arc = ',Math.PI*r*(90-lat)/180);
+				var betterR = a*b/(Math.sqrt(a*a*Math.sin(latRad)*Math.sin(latRad)+b*b*Math.cos(latRad)*Math.cos(latRad)));
+				console.log('betterArc = ',Math.PI*betterR*(90-lat)/180);
+
+				console.log('min arc = ',Math.PI*b*(90-lat)/180);
+				console.log('max arc = ',Math.PI*a*(90-lat)/180,' (spread='+Math.round((Math.PI*a*(90-lat)/180-Math.PI*b*(90-lat)/180)*10)/10+')');
+				/* */
+			}
+
+			function redraw() {
+				document.getElementById('latInput').value = document.getElementById('latInput').value.replace(',','.');
+				var parsedLatitude = /^([0-9]+(?:.[0-9]+)?)$/.exec(document.getElementById('latInput').value);
+				if (
+					typeof parsedLatitude != 'undefined' &&
+					parsedLatitude != null &&
+					'1' in  parsedLatitude &&
+					typeof parsedLatitude[1] != 'undefined' &&
+					'NaN' != parseFloat(parsedLatitude[1])
+				) {
+					lat = Math.round(parseFloat(document.getElementById('latInput').value)*1000)/1000;
+
+					if (lat != 'NaN' && lat<=90.0 && lat>=0.0) {
+						document.getElementById('latInput').value = (Math.round(lat*1000)/1000);
+					} else {
+						alert('invalid value / nesprávna hodnota');
+					}
+					if (document.getElementById('latInput').value.indexOf('.')==-1) document.getElementById('latInput').value += '.000';
+
+					var adjacent = calculateDistance(lat);
+					drawTriangle(lat,adjacent);
+
+
+				} else {
+					alert('uknown format / neznámy formát');
+				}
+
+			}
+
+			function rad(deg) { return deg * Math.PI * rec180; }
+
+
+			function load() {
+				canvasSize = window.innerHeight-6;
+
+				document.getElementById('latInput').addEventListener('keyup', function(event) {
+					event.preventDefault();
+					if (event.keyCode === 13) {
+						setTimeout('redraw();',10);
+					}
+				});
+				document.getElementById('latInput').focus();
+				setTimeout('redraw();',10);
+			}
+
+		</script>
+	</head>
+	<body onload="load();">
+		<div id="mainContainer" style="padding:0px; margin:0px;">
+			<div>
+				North latitude in degrees / Severná zemepisná šírka v stupňoch: <input type="text" id="latInput" value="50.00" style="width:105px" /><button onclick="setTimeout('redraw();',10);">GO</button>
+			</div>
+			<div id="debug"></div>
+			<div id="canvasDiv"><canvas id="canvas"></canvas></div>
+		</div>
+	</body>
+</html>
