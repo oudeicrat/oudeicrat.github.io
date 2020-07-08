@@ -107,11 +107,13 @@
 					//console.log(result);
 					return result;
 				}
-				draw() {
+				getRotatedPos() {
+					return rotate(this.position);
+				}
+				draw(pos2d) {
 					var scale = 250.0;
 					var offset = 300.0;
 					var forceScale = 32;
-					var pos2d = rotate(this.position);
 					
 					var radius = Math.round(scale / 2);
 					if (this.charge<0) radius = 10;
@@ -125,7 +127,9 @@
 					);
 					ctx.strokeStyle = '#000';
 					ctx.stroke();
+					ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
 					ctx.fill();
+					ctx.lineWidth = 2;
 					ctx.beginPath();					
 					ctx.arc(
 						Math.round(offset+scale*pos2d.x), 
@@ -135,7 +139,8 @@
 					);
 					ctx.strokeStyle = '#000';
 					ctx.stroke();
-					//ctx.fill();
+					ctx.fillStyle = 'rgba(200, 200, 200, 0.75)';
+					ctx.fill();
 					
 					
 					ctx.beginPath();
@@ -162,9 +167,23 @@
 				//canvasSize = window.innerWidth-6;
 				ctx.canvas.width = window.innerWidth-6;
 				ctx.canvas.height = window.innerHeight-6;
-				
+				//ctx.fillStyle = '#000';
+				//ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+				var drawPositions = [];
 				for (var i in elements) {
-					elements[i].draw();
+					var pos2d = elements[i].getRotatedPos();
+					var inserted = false;
+					for (var j in drawPositions) {
+						if (drawPositions[j].pos.z > pos2d.z) {
+							drawPositions.splice(j,0,{index:i,pos:pos2d});
+							inserted = true;
+							break;
+						}
+					}
+					if (!inserted) drawPositions.push({index:i,pos:pos2d});
+				}
+				for (var j in drawPositions) {
+					elements[drawPositions[j].index].draw(drawPositions[j].pos);
 				}
 			}
 			
