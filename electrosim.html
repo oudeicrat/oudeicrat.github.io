@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv=Content-Type content="text/html; charset=utf-8">
+		<title>Electric force 3D simulator</title>
+		
+		<style type="text/css">
+			body { font-family:Arial; font-size:12px; margin:0px; padding:0px; }
+			input { font-family:Arial; font-size:12px; }
+			button { font-family:Arial; font-size:12px; }
+		</style>
+		<script type="text/javascript">
+			var ctx;
+			var canvasSize;
+			var elements = [];
+			var k = 1;	
+
+		    var RotMatxx = 1;
+		    var RotMatxy = 0;
+		    var RotMatxz = 0;
+		    var RotMatyx = 0;
+		    var RotMatyy = 1;
+		    var RotMatyz = 0;
+		    var RotMatzx = 0;
+		    var RotMatzy = 0;
+		    var RotMatzz = 1;
+		    
+		    var rotPitch = 0;
+		    var rotRoll = 0;
+		    var rotYaw = 0;
+
+			function changeRotation(dPitch,dRoll,dYaw) {
+				rotPitch+=dPitch;
+				if (rotPitch > 2*Math.PI) rotPitch -= 2*Math.PI;
+				if (rotPitch < 0) rotPitch += 2*Math.PI;
+				rotRoll+=dRoll;
+				if (rotRoll > 2*Math.PI) rotRoll -= 2*Math.PI;
+				if (rotRoll < 0) rotRoll += 2*Math.PI;
+				rotYaw+=dYaw;
+				if (rotYaw > 2*Math.PI) rotYaw -= 2*Math.PI;
+				if (rotYaw < 0) rotYaw += 2*Math.PI;
+				recalcRotation();
+			}
+			function recalcRotation() {
+			    var cosa = Math.cos(rotYaw);
+			    var sina = Math.sin(rotYaw);
+			    var cosb = Math.cos(rotPitch);
+			    var sinb = Math.sin(rotPitch);
+			    var cosc = Math.cos(rotRoll);
+			    var sinc = Math.sin(rotRoll);
+			    RotMatxx = cosa*cosb;
+			    RotMatxy = cosa*sinb*sinc - sina*cosc;
+			    RotMatxz = cosa*sinb*cosc + sina*sinc;
+			    RotMatyx = sina*cosb;
+			    RotMatyy = sina*sinb*sinc + cosa*cosc;
+			    RotMatyz = sina*sinb*cosc - cosa*sinc;
+			    RotMatzx = -sinb;
+			    RotMatzy = cosb*sinc;
+			    RotMatzz = cosb*cosc;
+			    //console.log(rotPitch,rotRoll,rotYaw);
+			}			
+
+			function rotate(position) {
+				var result = {x:0.0,y:0.0,z:0.0};
+				
+				result.x = RotMatxx*position.x + RotMatxy*position.y + RotMatxz*position.z;
+				result.y = RotMatyx*position.x + RotMatyy*position.y + RotMatyz*position.z;
+				result.z = RotMatzx*position.x + RotMatzy*position.y + RotMatzz*position.z;
+		
+				return result;
+			}
+
+			class Chargetron {
+				constructor(charge,position) {
+					this.charge = charge;
+					this.position = position;
+				}
+				getPosition() { return this.position; }
+				getCharge() { return this.charge; }
+				getForce() {
+					var motionScale = 0.001;
+					var result = {x:0.0,y:0.0,z:0.0};
+					for (var i in elements) {
+						if (this !== elements[i]) {
+							var pos = elements[i].getPosition();
+							var dSquared = 
+								(this.position.x-pos.x)*(this.position.x-pos.x)+
+								(this.position.y-pos.y)*(this.position.y-pos.y)+
+								(this.position.z-pos.z)*(this.position.z-pos.z);
+							//console.log(dSquared);
+							if (dSquared > 0.00001) {
+								var d = Math.sqrt(dSquared);
+								var magnitude = k * this.charge * elements[i].getCharge() / dSquared;
+								result.x += (this.position.x-pos.x) / d * magnitude;
+								result.y += (this.position.y-pos.y) / d * magnitude;
+								result.z += (this.position.z-pos.z) / d * magnitude;
+							}
+						}
+					}
+					
+					//translation in the direction of the force (without momentum conservation)
+					//TODO: stop movement if too close to other objects (essentially adding a repulsive force)
+					//this.position.x += motionScale * result.x;
+					//this.position.y += motionScale * result.y;
+					//this.position.z += motionScale * result.z;
+					
+					//console.log(result);
+					return result;
+				}
+				draw() {
+					var scale = 250.0;
+					var offset = 300.0;
+					var forceScale = 32;
+					var pos2d = rotate(this.position);
+					
+					var radius = Math.round(scale / 2);
+					if (this.charge<0) radius = 10;
+					//ctx.fillStyle = '';
+					ctx.beginPath();					
+					ctx.arc(
+						Math.round(offset+scale*pos2d.x), 
+						Math.round(offset+scale*pos2d.y),
+						Math.round(2), 
+						0, 2*Math.PI, true
+					);
+					ctx.strokeStyle = '#000';
+					ctx.stroke();
+					ctx.fill();
+					ctx.beginPath();					
+					ctx.arc(
+						Math.round(offset+scale*pos2d.x), 
+						Math.round(offset+scale*pos2d.y),
+						Math.round(radius), 
+						0, 2*Math.PI, true
+					);
+					ctx.strokeStyle = '#000';
+					ctx.stroke();
+					//ctx.fill();
+					
+					
+					ctx.beginPath();
+					ctx.lineWidth = 1;
+					ctx.strokeStyle = '#c00';
+					
+					var force = this.getForce();
+					var force2d = rotate(force);
+					ctx.moveTo(
+						Math.round(offset+scale*pos2d.x), 
+						Math.round(offset+scale*pos2d.y),
+					);
+					ctx.lineTo(
+						Math.round(offset+scale*pos2d.x + forceScale*force2d.x), 
+						Math.round(offset+scale*pos2d.y + forceScale*force2d.y)
+					);
+					ctx.stroke();
+					
+				}
+			
+			}
+				
+			function draw() {
+				//canvasSize = window.innerWidth-6;
+				ctx.canvas.width = window.innerWidth-6;
+				ctx.canvas.height = window.innerHeight-6;
+				
+				for (var i in elements) {
+					elements[i].draw();
+				}
+			}
+			
+			function load() {
+				ctx = document.getElementById('canvas').getContext('2d');
+				//Helium 4
+				/* */
+				elements.push(new Chargetron( 1,{x:-0.5, y:-0.5,                   z:-0.5}));
+				elements.push(new Chargetron( 1,{x: 0.5, y:-0.5,                   z:-0.5}));
+				elements.push(new Chargetron( 1,{x: 0.0, y:Math.sqrt(3.0)/2.0-0.5, z:-0.5}));
+				elements.push(new Chargetron( 1,{x: 0.0, y:Math.sqrt(3.0)/6.0-0.5, z:Math.sqrt(6.0)/3.0-0.5}));
+				elements.push(new Chargetron(-1,{x:-0.25,y:Math.sqrt(3.0)/4.0-0.5, z:-0.5}));
+				elements.push(new Chargetron(-1,{x: 0.25,y:Math.sqrt(3.0)/12.0-0.5,z:Math.sqrt(6.0)/6.0-0.5}));
+				/* */
+				//Hydrogen 2
+				/* * /
+				elements.push(new Chargetron( 1,{x:0.0, y:0.0,                z:0.0}));
+				elements.push(new Chargetron( 1,{x:1.0, y:0.0,                z:0.0}));
+				elements.push(new Chargetron(-1,{x:0.5, y:0.0,                z:0.0}));
+				/* */
+				changeRotation(0,0,0);
+				draw();
+				
+				var oldPosX = 0;
+				var oldPosY = 0;
+				var mouseIsDown = false;
+				window.addEventListener('mousedown', function(e) {
+					oldPosX = e.offsetX;
+					oldPosY = e.offsetY;
+					mouseIsDown = true;
+				});
+				window.addEventListener('mousemove', function(e) {
+					if (mouseIsDown) {
+						//e.offsetX; e.offsetY;
+						rotPitch -= 0.005 * (e.offsetX - oldPosX);
+						rotRoll += 0.005 * (e.offsetY - oldPosY);
+						if (rotPitch > 2*Math.PI) rotPitch -= 2*Math.PI;
+						if (rotPitch < 0) rotPitch += 2*Math.PI;
+						if (rotRoll > 2*Math.PI) rotRoll -= 2*Math.PI;
+						if (rotRoll < 0) rotRoll += 2*Math.PI;
+						
+						oldPosX = e.offsetX;
+						oldPosY = e.offsetY;
+						recalcRotation();
+						draw();
+					}
+				});
+				window.addEventListener('mouseup', function(e) {
+					mouseIsDown = false;
+				});
+				
+				//setInterval(function(){
+				//	changeRotation(0.005,0.004,0.003);
+				//	draw();
+				//},60);
+			}
+			var previousWindowHeight = 0;
+			var previousWindowWidth = 0;
+			function resizeHandler() {
+				if (
+					Math.abs(previousWindowHeight-window.innerHeight) > 3 ||
+					Math.abs(previousWindowWidth-window.innerWidth) > 3
+				) {
+					draw();
+				}
+			}//resizeHandler
+			
+		</script>
+	</head>
+	<body onload="load();" onresize="setTimeout('resizeHandler();',10);">
+		<div id="mainContainer" style="padding:0px; margin:0px;">
+			<div id="canvasDiv" style="float:left; padding:0px; margin:0px; display:block;"><canvas id="canvas"></canvas></div>
+		</div>
+	</body>
+</html>
