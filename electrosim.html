@@ -10,15 +10,18 @@
 			button { font-family:Arial; font-size:12px; }
 		</style>
 		<script type="text/javascript">
+			var e = 1;
+		
 			var ctx;
-			var canvasSize;
 			var elements = [];
-			var k = 1;
 			
-			var scale = 180.0;
-			var offset = 300.0;
-			var forceScale = 23;
+			var scale;
+			var offset;
+			var forceScale;
 
+			var rotMouseX = 1;
+			var rotMouseY = 1;
+			
 		    var RotMatxx = 1;
 		    var RotMatxy = 0;
 		    var RotMatxz = 0;
@@ -32,6 +35,10 @@
 		    var rotPitch = 0;
 		    var rotRoll = 0;
 		    var rotYaw = 0;
+		    
+		    var findClickedX = -1;
+		    var findClickedY = -1;
+		    var lastFoundClicked = -1;
 
 			function changeRotation(dPitch,dRoll,dYaw) {
 				rotPitch+=dPitch;
@@ -75,11 +82,19 @@
 			}
 
 			class Chargetron {
-				constructor(charge,position,radius) {
+				constructor(charge,position,radius,id) {
+					if (typeof id === 'undefined' || id === null) {
+						this.id = elements.length;
+						//console.log(this.id);
+					} else {
+						this.id = id;
+					}
 					this.charge = charge;
 					this.position = position;
 					this.radius = radius;
+					this.selected = false;
 				}
+				toggleSelected() { this.selected = !this.selected; }
 				getPosition() { return this.position; }
 				getCharge() { return this.charge; }
 				getForce() {
@@ -95,7 +110,7 @@
 							//console.log(dSquared);
 							if (dSquared > 0.00001) {
 								var d = Math.sqrt(dSquared);
-								var magnitude = k * this.charge * elements[i].getCharge() / dSquared;
+								var magnitude = this.charge * elements[i].getCharge() / dSquared;
 								result.x += (this.position.x-pos.x) / d * magnitude;
 								result.y += (this.position.y-pos.y) / d * magnitude;
 								result.z += (this.position.z-pos.z) / d * magnitude;
@@ -118,23 +133,33 @@
 				draw(pos2d) {
 					var radius = 1;
 					if (this.radius == 0) {
-						radius = Math.round(scale / 2);
+						radius = scale / 2;
 					} else {
 						radius = this.radius * scale;
 					}
-					if (this.charge<0) radius = 10;
-					//ctx.fillStyle = '';
+					if (this.charge<0) radius = 10; //smaller spheres for electrons
+					
+					if (findClickedX > 0 && findClickedY > 0) {
+						if (
+							radius*radius > (offset + scale * pos2d.x - findClickedX) * (offset + scale * pos2d.x - findClickedX) +
+							(offset + scale * pos2d.y - findClickedY) * (offset + scale * pos2d.y - findClickedY)
+						) lastFoundClicked = this.id;
+						return false; //don't draw, only looking for the clicked object
+					}
+					
+					//center dot
 					ctx.beginPath();					
 					ctx.arc(
 						Math.round(offset+scale*pos2d.x), 
 						Math.round(offset+scale*pos2d.y),
-						Math.round(2), 
+						2, 
 						0, 2*Math.PI, true
 					);
 					ctx.strokeStyle = '#000';
 					ctx.stroke();
 					ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
 					ctx.fill();
+					//sphere
 					ctx.lineWidth = 2;
 					ctx.beginPath();					
 					ctx.arc(
@@ -145,10 +170,14 @@
 					);
 					ctx.strokeStyle = '#000';
 					ctx.stroke();
-					ctx.fillStyle = 'rgba(200, 200, 200, 0.75)';
+					if (this.selected) {
+						ctx.fillStyle = 'rgba(255, 180, 180, 0.7)';
+					} else {
+						ctx.fillStyle = 'rgba(200, 200, 200, 0.75)';
+					}
 					ctx.fill();
 					
-					
+					//force vector
 					ctx.beginPath();
 					ctx.lineWidth = 1;
 					ctx.strokeStyle = '#c00';
@@ -170,16 +199,25 @@
 			}
 				
 			function draw() {
-				//canvasSize = window.innerWidth-6;
+				previousWindowHeight = window.innerHeight;
+				previousWindowWidth = window.innerWidth;
+			
 				ctx.canvas.width = window.innerWidth-6;
 				ctx.canvas.height = window.innerHeight-6;
-				//ctx.fillStyle = '#000';
+				scale = window.innerHeight;
+				if (window.innerWidth < window.innerHeight) scale = window.innerWidth;
+				offset = scale/2;
+				scale = scale*0.3;
+				forceScale = scale/10;
+				
+				//ctx.fillStyle = 'rgba(200, 200, 200, 0.75)';
 				//ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-				var drawPositions = [];
+				
+				var drawPositions = []; //z-buffer
 				for (var i in elements) {
 					var pos2d = elements[i].getRotatedPos();
 					var inserted = false;
-					for (var j in drawPositions) {
+					for (var j in drawPositions) { //insert sort
 						if (drawPositions[j].pos.z > pos2d.z) {
 							drawPositions.splice(j,0,{index:i,pos:pos2d});
 							inserted = true;
@@ -194,32 +232,40 @@
 			}
 			function selectShape(n) {
 				elements = [];
-				if (n==4) {
-					//Helium 4
-					/* */
-					//elements.push(new Chargetron( 1,{x:-0.5, y:-0.5,                   z:-0.5},                  0.5));
-					//elements.push(new Chargetron( 1,{x: 0.5, y:-0.5,                   z:-0.5},                  0.5));
-					//elements.push(new Chargetron( 1,{x: 0.0, y:Math.sqrt(3.0)/2.0-0.5, z:-0.5},                  0.5));
-					//elements.push(new Chargetron( 1,{x: 0.0, y:Math.sqrt(3.0)/6.0-0.5, z:Math.sqrt(6.0)/3.0-0.5},0.5));
-					
-					elements.push(new Chargetron( 1,{x:-0.5, y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12},0.5));
-					elements.push(new Chargetron( 1,{x: 0.5, y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12},0.5));
-					elements.push(new Chargetron( 1,{x: 0,   y: Math.sqrt(3)/3, z:-Math.sqrt(6)/12},0.5));
-					elements.push(new Chargetron( 1,{x: 0,   y: 0,              z: Math.sqrt(6)/4}, 0.5));
-					
-					elements.push(new Chargetron(-1,{x:0,y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12}, 0));
-					elements.push(new Chargetron(-1,{x:0,y: Math.sqrt(3)/6, z: Math.sqrt(6)/12},  0));
-					/* */
-				} else if (n==2) {
+				
+				if (n==2) {
 					//Hydrogen 2
-					/* */
-					elements.push(new Chargetron( 1,{x:-0.5, y:0.0, z:0.0},0.5));
-					elements.push(new Chargetron( 1,{x: 0.5, y:0.0, z:0.0},0.5));
-					elements.push(new Chargetron(-1,{x: 0.0, y:0.0, z:0.0},0));
-					/* */
+					elements.push(new Chargetron( e,{x:-0.5, y:0.0, z:0.0},0.5));
+					elements.push(new Chargetron( e,{x: 0.5, y:0.0, z:0.0},0.5));
+					elements.push(new Chargetron(-e,{x: 0.0, y:0.0, z:0.0},0));
+					
+				} else if (n==4) {
+					//Helium 4
+					elements.push(new Chargetron( e,{x:-0.5, y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12},0.5));
+					elements.push(new Chargetron( e,{x: 0.5, y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12},0.5));
+					elements.push(new Chargetron( e,{x: 0,   y: Math.sqrt(3)/3, z:-Math.sqrt(6)/12},0.5));
+					elements.push(new Chargetron( e,{x: 0,   y: 0,              z: Math.sqrt(6)/4}, 0.5));
+					//electrons
+					elements.push(new Chargetron(-e,{x:0,y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12}, 0));
+					elements.push(new Chargetron(-e,{x:0,y: Math.sqrt(3)/6, z: Math.sqrt(6)/12}, 0));
+
+				} else if (n==-4) {
+					//Helium 4 distributed electrons
+					elements.push(new Chargetron( e,{x:-0.5, y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12},0.5));
+					elements.push(new Chargetron( e,{x: 0.5, y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12},0.5));
+					elements.push(new Chargetron( e,{x: 0,   y: Math.sqrt(3)/3, z:-Math.sqrt(6)/12},0.5));
+					elements.push(new Chargetron( e,{x: 0,   y: 0,              z: Math.sqrt(6)/4}, 0.5));
+					//electrons
+					var de = e*2/6; //distribute 2 electrons to 6 positions
+					elements.push(new Chargetron(-de,{x: 0,    y:-Math.sqrt(3)/6,  z:-Math.sqrt(6)/12}, 0));
+					elements.push(new Chargetron(-de,{x: 0,    y: Math.sqrt(3)/6,  z: Math.sqrt(6)/12}, 0));
+					elements.push(new Chargetron(-de,{x: 0.25, y: Math.sqrt(3)/12, z:-Math.sqrt(6)/12}, 0));
+					elements.push(new Chargetron(-de,{x:-0.25, y:-Math.sqrt(3)/12, z: Math.sqrt(6)/12}, 0));
+					elements.push(new Chargetron(-de,{x:-0.25, y: Math.sqrt(6)/12, z:-Math.sqrt(6)/12}, 0));
+					elements.push(new Chargetron(-de,{x: 0.25, y:-Math.sqrt(6)/12, z: Math.sqrt(6)/12}, 0));
+					
 				} else if (n==7) {
 					//Lithium 7
-					/* */
 					//https://mathworld.wolfram.com/RegularPentagon.html
 					var c1 = (Math.sqrt(5)-1)/4;
 					var c2 = (Math.sqrt(5)+1)/4;
@@ -227,40 +273,171 @@
 					var s2 = Math.sqrt(10-2*Math.sqrt(5))/4;
 					var rd = Math.sqrt(s1*s1+(c1-1)*(c1-1))/2;
 					var al = Math.sqrt(4*rd*rd-1);
-					elements.push(new Chargetron( 1,{x:  0, y:  1, z: 0}, rd));
-					elements.push(new Chargetron( 1,{x: s1, y: c1, z: 0}, rd));
-					elements.push(new Chargetron( 1,{x: s2, y:-c2, z: 0}, rd));
-					elements.push(new Chargetron( 1,{x:-s2, y:-c2, z: 0}, rd));
-					elements.push(new Chargetron( 1,{x:-s1, y: c1, z: 0}, rd));
-					elements.push(new Chargetron( 1,{x:  0, y:  0, z: al}, rd));
-					elements.push(new Chargetron( 1,{x:  0, y:  0, z:-al}, rd));
+					elements.push(new Chargetron( e,{x:  0, y:  1, z: 0}, rd));
+					elements.push(new Chargetron( e,{x: s1, y: c1, z: 0}, rd));
+					elements.push(new Chargetron( e,{x: s2, y:-c2, z: 0}, rd));
+					elements.push(new Chargetron( e,{x:-s2, y:-c2, z: 0}, rd));
+					elements.push(new Chargetron( e,{x:-s1, y: c1, z: 0}, rd));
+					elements.push(new Chargetron( e,{x:  0, y:  0, z: al}, rd));
+					elements.push(new Chargetron( e,{x:  0, y:  0, z:-al}, rd));
 					
-					elements.push(new Chargetron(-1,{x:s1/2,       y:(c1+1)/2,  z: 0}, 0));
-					//elements.push(new Chargetron(-1,{x:(s1+s2)/2,  y:(c1-c2)/2, z: 0}, 0));
-					elements.push(new Chargetron(-1,{x:0,          y:-c2,       z: 0}, 0));
-					//elements.push(new Chargetron(-1,{x:(-s2-s1)/2, y:(c1-c2)/2, z: 0}, 0));
-					//elements.push(new Chargetron(-1,{x:-s1/2,      y:(c1+1)/2,  z: 0}, 0));
+					//electrons
+					//TODO: find the right positions for the 4 electrons
+					elements.push(new Chargetron(-e,{x:s1/2,       y:(c1+1)/2,  z: 0}, 0));
+					//elements.push(new Chargetron(-e,{x:(s1+s2)/2,  y:(c1-c2)/2, z: 0}, 0));
+					elements.push(new Chargetron(-e,{x:0,          y:-c2,       z: 0}, 0));
+					//elements.push(new Chargetron(-e,{x:(-s2-s1)/2, y:(c1-c2)/2, z: 0}, 0));
+					//elements.push(new Chargetron(-e,{x:-s1/2,      y:(c1+1)/2,  z: 0}, 0));
 					
-					elements.push(new Chargetron(-1,{x:0,     y:1/2,   z: al/2}, 0));
-					//elements.push(new Chargetron(-1,{x:s1/2,  y:c1/2,  z: al/2}, 0));
-					//elements.push(new Chargetron(-1,{x:s2/2,  y:-c2/2, z: al/2}, 0));
-					//elements.push(new Chargetron(-1,{x:-s2/2, y:-c2/2, z: al/2}, 0));
-					//elements.push(new Chargetron(-1,{x:-s1/2, y:c1/2,  z: al/2}, 0));
+					elements.push(new Chargetron(-e,{x:0,     y:1/2,   z: al/2}, 0));
+					//elements.push(new Chargetron(-e,{x:s1/2,  y:c1/2,  z: al/2}, 0));
+					//elements.push(new Chargetron(-e,{x:s2/2,  y:-c2/2, z: al/2}, 0));
+					//elements.push(new Chargetron(-e,{x:-s2/2, y:-c2/2, z: al/2}, 0));
+					//elements.push(new Chargetron(-e,{x:-s1/2, y:c1/2,  z: al/2}, 0));
 
-					//elements.push(new Chargetron(-1,{x:0,     y:1/2,   z:-al/2}, 0));
-					//elements.push(new Chargetron(-1,{x:s1/2,  y:c1/2,  z:-al/2}, 0));
-					//elements.push(new Chargetron(-1,{x:s2/2,  y:-c2/2, z:-al/2}, 0));
-					elements.push(new Chargetron(-1,{x:-s2/2, y:-c2/2, z:-al/2}, 0));
-					//elements.push(new Chargetron(-1,{x:-s1/2, y:c1/2,  z:-al/2}, 0));
+					//elements.push(new Chargetron(-e,{x:0,     y:1/2,   z:-al/2}, 0));
+					//elements.push(new Chargetron(-e,{x:s1/2,  y:c1/2,  z:-al/2}, 0));
+					//elements.push(new Chargetron(-e,{x:s2/2,  y:-c2/2, z:-al/2}, 0));
+					elements.push(new Chargetron(-e,{x:-s2/2, y:-c2/2, z:-al/2}, 0));
+					//elements.push(new Chargetron(-e,{x:-s1/2, y:c1/2,  z:-al/2}, 0));
 					
 					//4 electrons in the inner center in a tetrahedron shape
-					//elements.push(new Chargetron(-1,{x:-0.5/2, y:-Math.sqrt(3)/6/2, z:-Math.sqrt(6)/12/2},0));
-					//elements.push(new Chargetron(-1,{x: 0.5/2, y:-Math.sqrt(3)/6/2, z:-Math.sqrt(6)/12/2},0));
-					//elements.push(new Chargetron(-1,{x: 0/2,   y: Math.sqrt(3)/3/2, z:-Math.sqrt(6)/12/2},0));
-					//elements.push(new Chargetron(-1,{x: 0/2,   y: 0,              z: Math.sqrt(6)/4/2},0));
+					var es = 0.4;
+					//elements.push(new Chargetron(-e,{x:-0.5*es, y:-Math.sqrt(3)/6*es, z:-Math.sqrt(6)/12*es},0));
+					//elements.push(new Chargetron(-e,{x: 0.5*es, y:-Math.sqrt(3)/6*es, z:-Math.sqrt(6)/12*es},0));
+					//elements.push(new Chargetron(-e,{x: 0,      y: Math.sqrt(3)/3*es, z:-Math.sqrt(6)/12*es},0));
+					//elements.push(new Chargetron(-e,{x: 0,      y: 0,                 z: Math.sqrt(6)/4*es}, 0));
 					
+				} else if (n==-7) {
+					//Lithium 7 distributed electrons
+					//https://mathworld.wolfram.com/RegularPentagon.html
+					var c1 = (Math.sqrt(5)-1)/4;
+					var c2 = (Math.sqrt(5)+1)/4;
+					var s1 = Math.sqrt(10+2*Math.sqrt(5))/4;
+					var s2 = Math.sqrt(10-2*Math.sqrt(5))/4;
+					var rd = Math.sqrt(s1*s1+(c1-1)*(c1-1))/2;
+					var al = Math.sqrt(4*rd*rd-1);
+					elements.push(new Chargetron( e,{x:  0, y:  1, z: 0}, rd));
+					elements.push(new Chargetron( e,{x: s1, y: c1, z: 0}, rd));
+					elements.push(new Chargetron( e,{x: s2, y:-c2, z: 0}, rd));
+					elements.push(new Chargetron( e,{x:-s2, y:-c2, z: 0}, rd));
+					elements.push(new Chargetron( e,{x:-s1, y: c1, z: 0}, rd));
+					elements.push(new Chargetron( e,{x:  0, y:  0, z: al}, rd));
+					elements.push(new Chargetron( e,{x:  0, y:  0, z:-al}, rd));
 					
-					/* */				
+					//electrons
+					var de = e*4/15; //distribute 4 electrons to 15 positions;
+					elements.push(new Chargetron(-de,{x:s1/2,       y:(c1+1)/2,  z: 0}, 0));
+					elements.push(new Chargetron(-de,{x:(s1+s2)/2,  y:(c1-c2)/2, z: 0}, 0));
+					elements.push(new Chargetron(-de,{x:0,          y:-c2,       z: 0}, 0));
+					elements.push(new Chargetron(-de,{x:(-s2-s1)/2, y:(c1-c2)/2, z: 0}, 0));
+					elements.push(new Chargetron(-de,{x:-s1/2,      y:(c1+1)/2,  z: 0}, 0));
+					
+					elements.push(new Chargetron(-de,{x:0,     y:1/2,   z: al/2}, 0));
+					elements.push(new Chargetron(-de,{x:s1/2,  y:c1/2,  z: al/2}, 0));
+					elements.push(new Chargetron(-de,{x:s2/2,  y:-c2/2, z: al/2}, 0));
+					elements.push(new Chargetron(-de,{x:-s2/2, y:-c2/2, z: al/2}, 0));
+					elements.push(new Chargetron(-de,{x:-s1/2, y:c1/2,  z: al/2}, 0));
+
+					elements.push(new Chargetron(-de,{x:0,     y:1/2,   z:-al/2}, 0));
+					elements.push(new Chargetron(-de,{x:s1/2,  y:c1/2,  z:-al/2}, 0));
+					elements.push(new Chargetron(-de,{x:s2/2,  y:-c2/2, z:-al/2}, 0));
+					elements.push(new Chargetron(-de,{x:-s2/2, y:-c2/2, z:-al/2}, 0));
+					elements.push(new Chargetron(-de,{x:-s1/2, y:c1/2,  z:-al/2}, 0));
+					
+				} else if (n==12) {
+					//Carbon 12
+					var halfPhi = (1+Math.sqrt(5))/4;
+					var rd = 0.5;
+					elements.push(new Chargetron( e,{x:-halfPhi, y: 0,       z:-0.5},     rd)); //north
+					//cancer
+					elements.push(new Chargetron( e,{x:-0.5,     y:-halfPhi, z: 0},       rd));
+					elements.push(new Chargetron( e,{x: 0,       y:-0.5,     z:-halfPhi}, rd));
+					elements.push(new Chargetron( e,{x: 0,       y: 0.5,     z:-halfPhi}, rd));
+					elements.push(new Chargetron( e,{x:-0.5,     y: halfPhi, z: 0},       rd));
+					elements.push(new Chargetron( e,{x:-halfPhi, y: 0,       z: 0.5},     rd));
+
+					elements.push(new Chargetron( e,{x: halfPhi, y: 0,       z: 0.5},     rd)); //south
+					//capricorn					
+					elements.push(new Chargetron( e,{x: 0.5,     y:-halfPhi, z: 0},       rd));
+					elements.push(new Chargetron( e,{x: halfPhi, y: 0,       z:-0.5},     rd));
+					elements.push(new Chargetron( e,{x: 0.5,     y: halfPhi, z: 0},       rd));
+					elements.push(new Chargetron( e,{x: 0,       y: 0.5,     z: halfPhi}, rd));
+					elements.push(new Chargetron( e,{x: 0,       y:-0.5,     z: halfPhi}, rd));
+					
+					//electrons
+
+					elements.push(new Chargetron(-e,{x: 0,       y: 0,       z: halfPhi}, 0)); //30
+					elements.push(new Chargetron(-e,{x: 0,       y: halfPhi, z: 0},       0)); //33
+					elements.push(new Chargetron(-e,{x:-halfPhi, y: 0,       z: 0},       0)); //16
+					elements.push(new Chargetron(-e,{x: halfPhi, y: 0,       z: 0},       0)); //23
+					elements.push(new Chargetron(-e,{x: 0,       y:-halfPhi, z: 0},       0)); //32
+					elements.push(new Chargetron(-e,{x: 0,       y: 0,       z:-halfPhi}, 0)); //18
+
+					
+				} else if (n==-12) {
+					//Carbon 12 distributed electrons
+					var halfPhi = (1+Math.sqrt(5))/4;
+					var rd = 0.5;
+					elements.push(new Chargetron( e,{x:-halfPhi, y: 0,       z:-0.5},     rd)); //north
+					//cancer
+					elements.push(new Chargetron( e,{x:-0.5,     y:-halfPhi, z: 0},       rd));
+					elements.push(new Chargetron( e,{x: 0,       y:-0.5,     z:-halfPhi}, rd));
+					elements.push(new Chargetron( e,{x: 0,       y: 0.5,     z:-halfPhi}, rd));
+					elements.push(new Chargetron( e,{x:-0.5,     y: halfPhi, z: 0},       rd));
+					elements.push(new Chargetron( e,{x:-halfPhi, y: 0,       z: 0.5},     rd));
+
+					elements.push(new Chargetron( e,{x: halfPhi, y: 0,       z: 0.5},     rd)); //south
+					//capricorn					
+					elements.push(new Chargetron( e,{x: 0.5,     y:-halfPhi, z: 0},       rd));
+					elements.push(new Chargetron( e,{x: halfPhi, y: 0,       z:-0.5},     rd));
+					elements.push(new Chargetron( e,{x: 0.5,     y: halfPhi, z: 0},       rd));
+					elements.push(new Chargetron( e,{x: 0,       y: 0.5,     z: halfPhi}, rd));
+					elements.push(new Chargetron( e,{x: 0,       y:-0.5,     z: halfPhi}, rd));
+					
+					//electrons
+					var de = e*6/30; //distribute 6 electrons to 30 positions
+					 
+					//between cancer and north
+					elements.push(new Chargetron(-de,{x:-(0.5+halfPhi)/2, y:-halfPhi/2, z:-0.25},            0)); //12
+					elements.push(new Chargetron(-de,{x:-halfPhi/2,       y:-0.25,      z:-(0.5+halfPhi)/2}, 0)); //13
+					elements.push(new Chargetron(-de,{x:-halfPhi/2,       y: 0.25,      z:-(0.5+halfPhi)/2}, 0)); //14
+					elements.push(new Chargetron(-de,{x:-(0.5+halfPhi)/2, y: halfPhi/2, z:-0.25},            0)); //15
+					elements.push(new Chargetron(-de,{x:-halfPhi,         y: 0,         z:0},                0)); //16
+					
+					//around cancer
+					elements.push(new Chargetron(-de,{x:-0.25,            y:-(0.5+halfPhi)/2, z:-halfPhi/2}, 0)); //17
+					elements.push(new Chargetron(-de,{x: 0,               y: 0,               z:-halfPhi},   0)); //18
+					elements.push(new Chargetron(-de,{x:-0.25,            y: (0.5+halfPhi)/2, z:-halfPhi/2}, 0)); //19
+					elements.push(new Chargetron(-de,{x:-(0.5+halfPhi)/2, y: halfPhi/2,       z: 0.25},      0)); //20
+					elements.push(new Chargetron(-de,{x:-(0.5+halfPhi)/2, y:-halfPhi/2,       z: 0.25},      0)); //21
+					
+					//between capricorn and south
+					elements.push(new Chargetron(-de,{x: (0.5+halfPhi)/2, y:-halfPhi/2, z: 0.25},            0)); //22
+					elements.push(new Chargetron(-de,{x: halfPhi,         y: 0,         z: 0},               0)); //23
+					elements.push(new Chargetron(-de,{x: (0.5+halfPhi)/2, y: halfPhi/2, z: 0.25},            0)); //24
+					elements.push(new Chargetron(-de,{x: halfPhi/2,       y: 0.25,      z: (0.5+halfPhi)/2}, 0)); //25
+					elements.push(new Chargetron(-de,{x: halfPhi/2,       y:-0.25,      z: (0.5+halfPhi)/2}, 0)); //26
+					
+					//around capricorn
+					elements.push(new Chargetron(-de,{x: (0.5+halfPhi)/2, y:-halfPhi/2,        z:-0.25},      0)); //27
+					elements.push(new Chargetron(-de,{x: (0.5+halfPhi)/2, y: halfPhi/2,        z:-0.25},      0)); //28
+					elements.push(new Chargetron(-de,{x: 0.25,            y: (0.5+halfPhi)/2,  z: halfPhi/2}, 0)); //29
+					elements.push(new Chargetron(-de,{x: 0,               y: 0,                z: halfPhi},   0)); //30
+					elements.push(new Chargetron(-de,{x: 0.25,            y:-(0.5+halfPhi)/2,  z: halfPhi/2}, 0)); //31
+					
+					//between cancer and capricorn
+					elements.push(new Chargetron(-de,{x: 0,         y:-halfPhi,         z: 0},               0)); //32
+					elements.push(new Chargetron(-de,{x: 0,         y: halfPhi,         z: 0},               0)); //33
+					elements.push(new Chargetron(-de,{x: halfPhi/2, y:-0.25,            z:-(0.5+halfPhi)/2}, 0)); //34
+					elements.push(new Chargetron(-de,{x:-halfPhi/2, y: 0.25,            z: (0.5+halfPhi)/2}, 0)); //35
+					elements.push(new Chargetron(-de,{x: 0.25,      y: (0.5+halfPhi)/2, z:-halfPhi/2},       0)); //36
+					elements.push(new Chargetron(-de,{x:-0.25,      y:-(0.5+halfPhi)/2, z: halfPhi/2},       0)); //37
+					elements.push(new Chargetron(-de,{x:-0.25,      y: (0.5+halfPhi)/2, z: halfPhi/2},       0)); //38
+					elements.push(new Chargetron(-de,{x: 0.25,      y:-(0.5+halfPhi)/2, z:-halfPhi/2},       0)); //39
+					elements.push(new Chargetron(-de,{x:-halfPhi/2, y:-0.25,            z: (0.5+halfPhi)/2}, 0)); //40
+					elements.push(new Chargetron(-de,{x: halfPhi/2, y: 0.25,            z:-(0.5+halfPhi)/2}, 0)); //41
+					
 				}
 				changeRotation(0,0,0);
 				draw();
@@ -268,43 +445,59 @@
 			function load() {
 				ctx = document.getElementById('canvas').getContext('2d');
 				
-				selectShape(7); //Lithium 7
-				
+				selectShape(12); //Carbon 12
 				
 				var oldPosX = 0;
 				var oldPosY = 0;
 				var mouseIsDown = false;
+				var rotated = false;
+				
 				window.addEventListener('mousedown', function(e) {
-					oldPosX = e.offsetX;
-					oldPosY = e.offsetY;
+					oldPosX = e.clientX;
+					oldPosY = e.clientY;
 					mouseIsDown = true;
+					rotated = false;
+					
+					var rect = document.getElementById('canvas').getBoundingClientRect();
+					findClickedX = e.clientX - rect.left;
+					findClickedY = e.clientY - rect.top;
+					lastFoundClicked = null;
+					draw();
+					if (null !== lastFoundClicked) {
+						elements[lastFoundClicked].toggleSelected();
+					}
+					findClickedX = -1; findClickedY = -1;
+					draw();
 				});
 				window.addEventListener('mousemove', function(e) {
 					if (mouseIsDown) {
-						//e.offsetX; e.offsetY;
-						rotPitch -= 0.005 * (e.offsetX - oldPosX);
-						rotRoll += 0.005 * (e.offsetY - oldPosY);
+						rotPitch -= rotMouseX * 0.005 * (e.clientX - oldPosX);
+						rotRoll +=  rotMouseY * 0.005 * (e.clientY - oldPosY);
 						if (rotPitch > 2*Math.PI) rotPitch -= 2*Math.PI;
 						if (rotPitch < 0) rotPitch += 2*Math.PI;
 						if (rotRoll > 2*Math.PI) rotRoll -= 2*Math.PI;
 						if (rotRoll < 0) rotRoll += 2*Math.PI;
+						if (rotYaw > 2*Math.PI) rotYaw -= 2*Math.PI;
+						if (rotYaw < 0) rotYaw += 2*Math.PI;
 						
-						oldPosX = e.offsetX;
-						oldPosY = e.offsetY;
+						oldPosX = e.clientX;
+						oldPosY = e.clientY;
 						recalcRotation();
+						rotated = true;
 						draw();
-						//e.stopPropagation();
-						//e.preventDefault();
 					}
 				});
 				window.addEventListener('mouseup', function(e) {
 					mouseIsDown = false;
+					//deselect selected element if rotation occured
+					if (rotated && null!==lastFoundClicked) {
+						elements[lastFoundClicked].toggleSelected();
+					} else {
+						//console.log(lastFoundClicked);
+					}
+					draw();
+					rotated = false;
 				});
-				
-				//setInterval(function(){
-				//	changeRotation(0.005,0.004,0.003);
-				//	draw();
-				//},60);
 			}
 			var previousWindowHeight = 0;
 			var previousWindowWidth = 0;
@@ -320,13 +513,19 @@
 		</script>
 	</head>
 	<body onload="load();" onresize="setTimeout('resizeHandler();',10);">
-		<div style="float:left;"><select id="shapeSelect" onchange="selectShape(this.value);">
-			<option value="2">Hydrogen 2</option>
-			<option value="4">Helium 4</option>
-			<option value="7" selected="selected">Lithium 7</option>
-		</select></div>
-		<div id="mainContainer" style="padding:0px; margin:0px; margin-left:120px;">
-			<div id="canvasDiv" style="float:left; padding:0px; margin:0px; display:block;"><canvas id="canvas"></canvas></div>
+		<div id="canvasDiv" style="position:absolute; top:0px; left:0px; z-index:0; padding:0px; margin:0px;"><canvas id="canvas"></canvas></div>
+		<div style="position:absolute; top:0px; left:0px; z-index:1; width:150px;">
+			<select id="shapeSelect" onchange="selectShape(this.value);">
+				<option value="2">Hydrogen 2</option>
+				<option value="4">Helium 4</option>
+				<option value="-4">Helium 4 dist</option>
+				<option value="7">Lithium 7</option>
+				<option value="-7">Lithium 7 dist</option>
+				<option value="12" selected="selected">Carbon 12</option>
+				<option value="-12">Carbon 12 dist</option>
+			</select><br />
+			<input type="checkbox" id="rotMouseX" onchange="rotMouseX*=-1;" /><label for="rotMouseX">swap mouse X</label><br />
+			<input type="checkbox" id="rotMouseY" onchange="rotMouseY*=-1;" /><label for="rotMouseY">swap mouse Y</label><br />
 		</div>
 	</body>
 </html>
