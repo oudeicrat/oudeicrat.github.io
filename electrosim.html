@@ -11,12 +11,17 @@
 		</style>
 		<script type="text/javascript">
 			var e = 1;
-		
+			var hardShells = true;
+			var doAnimate = false;
+			var timeScale = 0.001; //force to position factor
+			
+			var animationTimeout = null;
 			var ctx;
 			var elements = [];
 			
 			var scale;
-			var offset;
+			var offsetX;
+			var offsetY;
 			var forceScale;
 
 			var rotMouseX = 1;
@@ -97,8 +102,8 @@
 				toggleSelected() { this.selected = !this.selected; }
 				getPosition() { return this.position; }
 				getCharge() { return this.charge; }
+				getRadius() { return this.radius; }
 				getForce() {
-					var motionScale = 0.001;
 					var result = {x:0.0,y:0.0,z:0.0};
 					for (var i in elements) {
 						if (this !== elements[i]) {
@@ -108,9 +113,12 @@
 								(this.position.y-pos.y)*(this.position.y-pos.y)+
 								(this.position.z-pos.z)*(this.position.z-pos.z);
 							//console.log(dSquared);
-							if (dSquared > 0.00001) {
+							if (dSquared > 0.000001) {
 								var d = Math.sqrt(dSquared);
 								var magnitude = this.charge * elements[i].getCharge() / dSquared;
+								//if (d < elements[i].getRadius() + this.radius && repulsion) {
+								//	magnitude-= this.charge * elements[i].getCharge() * (elements[i].getRadius() + this.radius) / (dSquared * d);
+								//}
 								result.x += (this.position.x-pos.x) / d * magnitude;
 								result.y += (this.position.y-pos.y) / d * magnitude;
 								result.z += (this.position.z-pos.z) / d * magnitude;
@@ -118,13 +126,6 @@
 						}
 					}
 					
-					//translation in the direction of the force (without momentum conservation)
-					//TODO: stop movement if too close to other objects (essentially adding a repulsive force)
-					//this.position.x += motionScale * result.x;
-					//this.position.y += motionScale * result.y;
-					//this.position.z += motionScale * result.z;
-					
-					//console.log(result);
 					return result;
 				}
 				getRotatedPos() {
@@ -133,16 +134,16 @@
 				draw(pos2d) {
 					var radius = 1;
 					if (this.radius == 0) {
-						radius = scale / 2;
+						radius = 10;
 					} else {
 						radius = this.radius * scale;
 					}
-					if (this.charge<0) radius = 10; //smaller spheres for electrons
+					//if (this.charge<0) radius = 10; //smaller spheres for electrons
 					
 					if (findClickedX > 0 && findClickedY > 0) {
 						if (
-							radius*radius > (offset + scale * pos2d.x - findClickedX) * (offset + scale * pos2d.x - findClickedX) +
-							(offset + scale * pos2d.y - findClickedY) * (offset + scale * pos2d.y - findClickedY)
+							radius*radius > (offsetX + scale * pos2d.x - findClickedX) * (offsetX + scale * pos2d.x - findClickedX) +
+							(offsetY + scale * pos2d.y - findClickedY) * (offsetY + scale * pos2d.y - findClickedY)
 						) lastFoundClicked = this.id;
 						return false; //don't draw, only looking for the clicked object
 					}
@@ -150,8 +151,8 @@
 					//center dot
 					ctx.beginPath();					
 					ctx.arc(
-						Math.round(offset+scale*pos2d.x), 
-						Math.round(offset+scale*pos2d.y),
+						Math.round(offsetX+scale*pos2d.x), 
+						Math.round(offsetY+scale*pos2d.y),
 						2, 
 						0, 2*Math.PI, true
 					);
@@ -163,8 +164,8 @@
 					ctx.lineWidth = 2;
 					ctx.beginPath();					
 					ctx.arc(
-						Math.round(offset+scale*pos2d.x), 
-						Math.round(offset+scale*pos2d.y),
+						Math.round(offsetX+scale*pos2d.x), 
+						Math.round(offsetY+scale*pos2d.y),
 						Math.round(radius), 
 						0, 2*Math.PI, true
 					);
@@ -183,14 +184,48 @@
 					ctx.strokeStyle = '#c00';
 					
 					var force = this.getForce();
+					
+					if (doAnimate) {
+						var speed = document.getElementById('animationSpeed').value;
+						//no acceleration, momentum or inertia implemented yet
+						this.position.x += force.x * timeScale * speed;
+						this.position.y += force.y * timeScale * speed;
+						this.position.z += force.z * timeScale * speed;
+						
+						if (hardShells) { //prevent objects from merging, enforce impenetrable radius
+							for (var i in elements) {
+								if (this !== elements[i]) {
+									var pos = elements[i].getPosition();
+									var d = Math.sqrt(
+										(this.position.x-pos.x)*(this.position.x-pos.x)+
+										(this.position.y-pos.y)*(this.position.y-pos.y)+
+										(this.position.z-pos.z)*(this.position.z-pos.z)
+									);
+									var rad = elements[i].getRadius();
+									if (d < rad + this.radius) {
+										//move back to the surface of the violated boundary
+										var dirX = this.position.x - pos.x;
+										var dirY = this.position.y - pos.y;
+										var dirZ = this.position.z - pos.z;
+										var dirSize = Math.sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ);
+										this.position.x += dirX / dirSize * (rad + this.radius - d);
+										this.position.y += dirY / dirSize * (rad + this.radius - d);
+										this.position.z += dirZ / dirSize * (rad + this.radius - d);
+									}
+								}
+							}
+						}		
+						
+					}
+					
 					var force2d = rotate(force);
 					ctx.moveTo(
-						Math.round(offset+scale*pos2d.x), 
-						Math.round(offset+scale*pos2d.y),
+						Math.round(offsetX+scale*pos2d.x), 
+						Math.round(offsetY+scale*pos2d.y),
 					);
 					ctx.lineTo(
-						Math.round(offset+scale*pos2d.x + forceScale*force2d.x), 
-						Math.round(offset+scale*pos2d.y + forceScale*force2d.y)
+						Math.round(offsetX+scale*pos2d.x + forceScale*force2d.x), 
+						Math.round(offsetY+scale*pos2d.y + forceScale*force2d.y)
 					);
 					ctx.stroke();
 					
@@ -198,7 +233,7 @@
 			
 			}
 				
-			function draw() {
+			function redraw() {
 				previousWindowHeight = window.innerHeight;
 				previousWindowWidth = window.innerWidth;
 			
@@ -206,8 +241,9 @@
 				ctx.canvas.height = window.innerHeight-6;
 				scale = window.innerHeight;
 				if (window.innerWidth < window.innerHeight) scale = window.innerWidth;
-				offset = scale/2;
-				scale = scale*0.3;
+				offsetX = scale/1.6;
+				offsetY = scale/2;
+				scale = scale*0.25;
 				forceScale = scale/10;
 				
 				//ctx.fillStyle = 'rgba(200, 200, 200, 0.75)';
@@ -229,6 +265,15 @@
 				for (var j in drawPositions) {
 					elements[drawPositions[j].index].draw(drawPositions[j].pos);
 				}
+				if (animationTimeout !== null) {
+					clearTimeout(animationTimeout);
+					animationTimeout = null;
+				}
+				if (doAnimate) {
+					animationTimeout = setTimeout(function(){ redraw(); },20);
+				}
+				//console.log('doAnimate = ',doAnimate);
+				//console.log('repulsion = ',repulsion);
 			}
 			function selectShape(n) {
 				elements = [];
@@ -440,7 +485,7 @@
 					
 				}
 				changeRotation(0,0,0);
-				draw();
+				redraw();
 			}
 			function load() {
 				ctx = document.getElementById('canvas').getContext('2d');
@@ -462,12 +507,12 @@
 					findClickedX = e.clientX - rect.left;
 					findClickedY = e.clientY - rect.top;
 					lastFoundClicked = null;
-					draw();
+					redraw();
 					if (null !== lastFoundClicked) {
 						elements[lastFoundClicked].toggleSelected();
 					}
 					findClickedX = -1; findClickedY = -1;
-					draw();
+					redraw();
 				});
 				window.addEventListener('mousemove', function(e) {
 					if (mouseIsDown) {
@@ -484,7 +529,7 @@
 						oldPosY = e.clientY;
 						recalcRotation();
 						rotated = true;
-						draw();
+						redraw();
 					}
 				});
 				window.addEventListener('mouseup', function(e) {
@@ -495,7 +540,7 @@
 					} else {
 						//console.log(lastFoundClicked);
 					}
-					draw();
+					redraw();
 					rotated = false;
 				});
 			}
@@ -506,7 +551,7 @@
 					Math.abs(previousWindowHeight-window.innerHeight) > 3 ||
 					Math.abs(previousWindowWidth-window.innerWidth) > 3
 				) {
-					draw();
+					redraw();
 				}
 			}//resizeHandler
 			
@@ -526,6 +571,12 @@
 			</select><br />
 			<input type="checkbox" id="rotMouseX" onchange="rotMouseX*=-1;" /><label for="rotMouseX">swap mouse X</label><br />
 			<input type="checkbox" id="rotMouseY" onchange="rotMouseY*=-1;" /><label for="rotMouseY">swap mouse Y</label><br />
+			<input type="checkbox" id="hardShells" onchange="hardShells = !hardShells; redraw();"
+			 checked="checked" title="magic force preventing particles from merging"/>
+				<label for="hardShells" title="magic force preventing particles from merging">hard shells</label><br />
+			<input type="checkbox" id="animate" onchange="doAnimate = !doAnimate; redraw();" /><label for="animate">animate</label><br />
+			<label for="animationSpeed">animation speed</label><br />
+			<input type="range" id="animationSpeed" min="1" max="100" value="1" />
 		</div>
 	</body>
 </html>
