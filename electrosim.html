@@ -13,7 +13,11 @@
 			var ctx;
 			var canvasSize;
 			var elements = [];
-			var k = 1;	
+			var k = 1;
+			
+			var scale = 180.0;
+			var offset = 300.0;
+			var forceScale = 23;
 
 		    var RotMatxx = 1;
 		    var RotMatxy = 0;
@@ -71,9 +75,10 @@
 			}
 
 			class Chargetron {
-				constructor(charge,position) {
+				constructor(charge,position,radius) {
 					this.charge = charge;
 					this.position = position;
+					this.radius = radius;
 				}
 				getPosition() { return this.position; }
 				getCharge() { return this.charge; }
@@ -111,11 +116,12 @@
 					return rotate(this.position);
 				}
 				draw(pos2d) {
-					var scale = 250.0;
-					var offset = 300.0;
-					var forceScale = 32;
-					
-					var radius = Math.round(scale / 2);
+					var radius = 1;
+					if (this.radius == 0) {
+						radius = Math.round(scale / 2);
+					} else {
+						radius = this.radius * scale;
+					}
 					if (this.charge<0) radius = 10;
 					//ctx.fillStyle = '';
 					ctx.beginPath();					
@@ -186,26 +192,84 @@
 					elements[drawPositions[j].index].draw(drawPositions[j].pos);
 				}
 			}
-			
-			function load() {
-				ctx = document.getElementById('canvas').getContext('2d');
-				//Helium 4
-				/* */
-				elements.push(new Chargetron( 1,{x:-0.5, y:-0.5,                   z:-0.5}));
-				elements.push(new Chargetron( 1,{x: 0.5, y:-0.5,                   z:-0.5}));
-				elements.push(new Chargetron( 1,{x: 0.0, y:Math.sqrt(3.0)/2.0-0.5, z:-0.5}));
-				elements.push(new Chargetron( 1,{x: 0.0, y:Math.sqrt(3.0)/6.0-0.5, z:Math.sqrt(6.0)/3.0-0.5}));
-				elements.push(new Chargetron(-1,{x:-0.25,y:Math.sqrt(3.0)/4.0-0.5, z:-0.5}));
-				elements.push(new Chargetron(-1,{x: 0.25,y:Math.sqrt(3.0)/12.0-0.5,z:Math.sqrt(6.0)/6.0-0.5}));
-				/* */
-				//Hydrogen 2
-				/* * /
-				elements.push(new Chargetron( 1,{x:0.0, y:0.0,                z:0.0}));
-				elements.push(new Chargetron( 1,{x:1.0, y:0.0,                z:0.0}));
-				elements.push(new Chargetron(-1,{x:0.5, y:0.0,                z:0.0}));
-				/* */
+			function selectShape(n) {
+				elements = [];
+				if (n==4) {
+					//Helium 4
+					/* */
+					//elements.push(new Chargetron( 1,{x:-0.5, y:-0.5,                   z:-0.5},                  0.5));
+					//elements.push(new Chargetron( 1,{x: 0.5, y:-0.5,                   z:-0.5},                  0.5));
+					//elements.push(new Chargetron( 1,{x: 0.0, y:Math.sqrt(3.0)/2.0-0.5, z:-0.5},                  0.5));
+					//elements.push(new Chargetron( 1,{x: 0.0, y:Math.sqrt(3.0)/6.0-0.5, z:Math.sqrt(6.0)/3.0-0.5},0.5));
+					
+					elements.push(new Chargetron( 1,{x:-0.5, y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12},0.5));
+					elements.push(new Chargetron( 1,{x: 0.5, y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12},0.5));
+					elements.push(new Chargetron( 1,{x: 0,   y: Math.sqrt(3)/3, z:-Math.sqrt(6)/12},0.5));
+					elements.push(new Chargetron( 1,{x: 0,   y: 0,              z: Math.sqrt(6)/4}, 0.5));
+					
+					elements.push(new Chargetron(-1,{x:0,y:-Math.sqrt(3)/6, z:-Math.sqrt(6)/12}, 0));
+					elements.push(new Chargetron(-1,{x:0,y: Math.sqrt(3)/6, z: Math.sqrt(6)/12},  0));
+					/* */
+				} else if (n==2) {
+					//Hydrogen 2
+					/* */
+					elements.push(new Chargetron( 1,{x:-0.5, y:0.0, z:0.0},0.5));
+					elements.push(new Chargetron( 1,{x: 0.5, y:0.0, z:0.0},0.5));
+					elements.push(new Chargetron(-1,{x: 0.0, y:0.0, z:0.0},0));
+					/* */
+				} else if (n==7) {
+					//Lithium 7
+					/* */
+					//https://mathworld.wolfram.com/RegularPentagon.html
+					var c1 = (Math.sqrt(5)-1)/4;
+					var c2 = (Math.sqrt(5)+1)/4;
+					var s1 = Math.sqrt(10+2*Math.sqrt(5))/4;
+					var s2 = Math.sqrt(10-2*Math.sqrt(5))/4;
+					var rd = Math.sqrt(s1*s1+(c1-1)*(c1-1))/2;
+					var al = Math.sqrt(4*rd*rd-1);
+					elements.push(new Chargetron( 1,{x:  0, y:  1, z: 0}, rd));
+					elements.push(new Chargetron( 1,{x: s1, y: c1, z: 0}, rd));
+					elements.push(new Chargetron( 1,{x: s2, y:-c2, z: 0}, rd));
+					elements.push(new Chargetron( 1,{x:-s2, y:-c2, z: 0}, rd));
+					elements.push(new Chargetron( 1,{x:-s1, y: c1, z: 0}, rd));
+					elements.push(new Chargetron( 1,{x:  0, y:  0, z: al}, rd));
+					elements.push(new Chargetron( 1,{x:  0, y:  0, z:-al}, rd));
+					
+					elements.push(new Chargetron(-1,{x:s1/2,       y:(c1+1)/2,  z: 0}, 0));
+					//elements.push(new Chargetron(-1,{x:(s1+s2)/2,  y:(c1-c2)/2, z: 0}, 0));
+					elements.push(new Chargetron(-1,{x:0,          y:-c2,       z: 0}, 0));
+					//elements.push(new Chargetron(-1,{x:(-s2-s1)/2, y:(c1-c2)/2, z: 0}, 0));
+					//elements.push(new Chargetron(-1,{x:-s1/2,      y:(c1+1)/2,  z: 0}, 0));
+					
+					elements.push(new Chargetron(-1,{x:0,     y:1/2,   z: al/2}, 0));
+					//elements.push(new Chargetron(-1,{x:s1/2,  y:c1/2,  z: al/2}, 0));
+					//elements.push(new Chargetron(-1,{x:s2/2,  y:-c2/2, z: al/2}, 0));
+					//elements.push(new Chargetron(-1,{x:-s2/2, y:-c2/2, z: al/2}, 0));
+					//elements.push(new Chargetron(-1,{x:-s1/2, y:c1/2,  z: al/2}, 0));
+
+					//elements.push(new Chargetron(-1,{x:0,     y:1/2,   z:-al/2}, 0));
+					//elements.push(new Chargetron(-1,{x:s1/2,  y:c1/2,  z:-al/2}, 0));
+					//elements.push(new Chargetron(-1,{x:s2/2,  y:-c2/2, z:-al/2}, 0));
+					elements.push(new Chargetron(-1,{x:-s2/2, y:-c2/2, z:-al/2}, 0));
+					//elements.push(new Chargetron(-1,{x:-s1/2, y:c1/2,  z:-al/2}, 0));
+					
+					//4 electrons in the inner center in a tetrahedron shape
+					//elements.push(new Chargetron(-1,{x:-0.5/2, y:-Math.sqrt(3)/6/2, z:-Math.sqrt(6)/12/2},0));
+					//elements.push(new Chargetron(-1,{x: 0.5/2, y:-Math.sqrt(3)/6/2, z:-Math.sqrt(6)/12/2},0));
+					//elements.push(new Chargetron(-1,{x: 0/2,   y: Math.sqrt(3)/3/2, z:-Math.sqrt(6)/12/2},0));
+					//elements.push(new Chargetron(-1,{x: 0/2,   y: 0,              z: Math.sqrt(6)/4/2},0));
+					
+					
+					/* */				
+				}
 				changeRotation(0,0,0);
 				draw();
+			}
+			function load() {
+				ctx = document.getElementById('canvas').getContext('2d');
+				
+				selectShape(7); //Lithium 7
+				
 				
 				var oldPosX = 0;
 				var oldPosY = 0;
@@ -229,6 +293,8 @@
 						oldPosY = e.offsetY;
 						recalcRotation();
 						draw();
+						//e.stopPropagation();
+						//e.preventDefault();
 					}
 				});
 				window.addEventListener('mouseup', function(e) {
@@ -254,7 +320,12 @@
 		</script>
 	</head>
 	<body onload="load();" onresize="setTimeout('resizeHandler();',10);">
-		<div id="mainContainer" style="padding:0px; margin:0px;">
+		<div style="float:left;"><select id="shapeSelect" onchange="selectShape(this.value);">
+			<option value="2">Hydrogen 2</option>
+			<option value="4">Helium 4</option>
+			<option value="7" selected="selected">Lithium 7</option>
+		</select></div>
+		<div id="mainContainer" style="padding:0px; margin:0px; margin-left:120px;">
 			<div id="canvasDiv" style="float:left; padding:0px; margin:0px; display:block;"><canvas id="canvas"></canvas></div>
 		</div>
 	</body>
