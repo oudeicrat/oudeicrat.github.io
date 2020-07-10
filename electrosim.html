@@ -13,9 +13,12 @@
 			var e = 1;
 			var hardShells = true;
 			var doAnimate = false;
-			var timeScale = 0.001; //force to position factor
+			var timeScale = 0.0001; //force to position factor
 			
+			var animationSpeed;
+			var animationPrecision;
 			var animationTimeout = null;
+			var canvas;
 			var ctx;
 			var elements = [];
 			
@@ -77,7 +80,7 @@
 			}			
 
 			function rotate(position) {
-				var result = {x:0.0,y:0.0,z:0.0};
+				var result = {x:0,y:0,z:0};
 				
 				result.x = RotMatxx*position.x + RotMatxy*position.y + RotMatxz*position.z;
 				result.y = RotMatyx*position.x + RotMatyy*position.y + RotMatyz*position.z;
@@ -98,13 +101,14 @@
 					this.position = position;
 					this.radius = radius;
 					this.selected = false;
+					this.force = {x:0,y:0,z:0};
 				}
 				toggleSelected() { this.selected = !this.selected; }
 				getPosition() { return this.position; }
 				getCharge() { return this.charge; }
 				getRadius() { return this.radius; }
 				getForce() {
-					var result = {x:0.0,y:0.0,z:0.0};
+					var result = {x:0,y:0,z:0};
 					for (var i in elements) {
 						if (this !== elements[i]) {
 							var pos = elements[i].getPosition();
@@ -125,12 +129,45 @@
 							}
 						}
 					}
-					
+					this.force = result;
 					return result;
 				}
 				getRotatedPos() {
 					return rotate(this.position);
 				}
+				
+				animate() {
+					this.getForce();
+					//no acceleration, momentum or inertia implemented yet
+					this.position.x += this.force.x * timeScale * animationSpeed / animationPrecision;
+					this.position.y += this.force.y * timeScale * animationSpeed / animationPrecision;
+					this.position.z += this.force.z * timeScale * animationSpeed / animationPrecision;
+					
+					if (hardShells) { //prevent objects from merging, enforce impenetrable radius
+						for (var i in elements) {
+							if (this !== elements[i]) {
+								var pos = elements[i].getPosition();
+								var d = Math.sqrt(
+									(this.position.x-pos.x)*(this.position.x-pos.x)+
+									(this.position.y-pos.y)*(this.position.y-pos.y)+
+									(this.position.z-pos.z)*(this.position.z-pos.z)
+								);
+								var rad = elements[i].getRadius();
+								if (d < rad + this.radius) {
+									//move back to the surface of the violated boundary
+									var dirX = this.position.x - pos.x;
+									var dirY = this.position.y - pos.y;
+									var dirZ = this.position.z - pos.z;
+									var dirSize = Math.sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ);
+									this.position.x += dirX / dirSize * (rad + this.radius - d);
+									this.position.y += dirY / dirSize * (rad + this.radius - d);
+									this.position.z += dirZ / dirSize * (rad + this.radius - d);
+								}
+							}
+						}
+					}		
+				}
+				
 				draw(pos2d) {
 					var radius = 1;
 					if (this.radius == 0) {
@@ -183,42 +220,13 @@
 					ctx.lineWidth = 1;
 					ctx.strokeStyle = '#c00';
 					
-					var force = this.getForce();
-					
 					if (doAnimate) {
-						var speed = document.getElementById('animationSpeed').value;
-						//no acceleration, momentum or inertia implemented yet
-						this.position.x += force.x * timeScale * speed;
-						this.position.y += force.y * timeScale * speed;
-						this.position.z += force.z * timeScale * speed;
-						
-						if (hardShells) { //prevent objects from merging, enforce impenetrable radius
-							for (var i in elements) {
-								if (this !== elements[i]) {
-									var pos = elements[i].getPosition();
-									var d = Math.sqrt(
-										(this.position.x-pos.x)*(this.position.x-pos.x)+
-										(this.position.y-pos.y)*(this.position.y-pos.y)+
-										(this.position.z-pos.z)*(this.position.z-pos.z)
-									);
-									var rad = elements[i].getRadius();
-									if (d < rad + this.radius) {
-										//move back to the surface of the violated boundary
-										var dirX = this.position.x - pos.x;
-										var dirY = this.position.y - pos.y;
-										var dirZ = this.position.z - pos.z;
-										var dirSize = Math.sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ);
-										this.position.x += dirX / dirSize * (rad + this.radius - d);
-										this.position.y += dirY / dirSize * (rad + this.radius - d);
-										this.position.z += dirZ / dirSize * (rad + this.radius - d);
-									}
-								}
-							}
-						}		
-						
+						this.animate();
+					} else {
+						this.getForce();
 					}
 					
-					var force2d = rotate(force);
+					var force2d = rotate(this.force);
 					ctx.moveTo(
 						Math.round(offsetX+scale*pos2d.x), 
 						Math.round(offsetY+scale*pos2d.y),
@@ -228,26 +236,13 @@
 						Math.round(offsetY+scale*pos2d.y + forceScale*force2d.y)
 					);
 					ctx.stroke();
-					
 				}
-			
 			}
 				
 			function redraw() {
-				previousWindowHeight = window.innerHeight;
-				previousWindowWidth = window.innerWidth;
-			
-				ctx.canvas.width = window.innerWidth-6;
-				ctx.canvas.height = window.innerHeight-6;
-				scale = window.innerHeight;
-				if (window.innerWidth < window.innerHeight) scale = window.innerWidth;
-				offsetX = scale/1.6;
-				offsetY = scale/2;
-				scale = scale*0.25;
-				forceScale = scale/10;
-				
 				//ctx.fillStyle = 'rgba(200, 200, 200, 0.75)';
-				//ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+				ctx.fillStyle = '#fff';
+				ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 				
 				var drawPositions = []; //z-buffer
 				for (var i in elements) {
@@ -270,19 +265,27 @@
 					animationTimeout = null;
 				}
 				if (doAnimate) {
-					animationTimeout = setTimeout(function(){ redraw(); },20);
+					animationTimeout = setTimeout(function(){
+						for (var j=0; j<animationPrecision; j++) {
+							for (var i in elements) {
+								elements[i].animate();
+							}
+						}
+						redraw(); 
+					},40);
 				}
 				//console.log('doAnimate = ',doAnimate);
 				//console.log('repulsion = ',repulsion);
 			}
+			
 			function selectShape(n) {
 				elements = [];
 				
 				if (n==2) {
 					//Hydrogen 2
-					elements.push(new Chargetron( e,{x:-0.5, y:0.0, z:0.0},0.5));
-					elements.push(new Chargetron( e,{x: 0.5, y:0.0, z:0.0},0.5));
-					elements.push(new Chargetron(-e,{x: 0.0, y:0.0, z:0.0},0));
+					elements.push(new Chargetron( e,{x:-0.5, y:0, z:0},0.5));
+					elements.push(new Chargetron( e,{x: 0.5, y:0, z:0},0.5));
+					elements.push(new Chargetron(-e,{x: 0,   y:0, z:0},0));
 					
 				} else if (n==4) {
 					//Helium 4
@@ -485,10 +488,11 @@
 					
 				}
 				changeRotation(0,0,0);
-				redraw();
+				if (!doAnimate) redraw();
 			}
 			function load() {
-				ctx = document.getElementById('canvas').getContext('2d');
+				canvas = document.getElementById('canvas');
+				ctx = canvas.getContext('2d');
 				
 				selectShape(12); //Carbon 12
 				
@@ -497,24 +501,27 @@
 				var mouseIsDown = false;
 				var rotated = false;
 				
-				window.addEventListener('mousedown', function(e) {
+				animationSpeed = document.getElementById('animationSpeed').value;
+				animationPrecision = document.getElementById('animationPrecision').value;
+				
+				canvas.addEventListener('mousedown', function(e) {
 					oldPosX = e.clientX;
 					oldPosY = e.clientY;
 					mouseIsDown = true;
 					rotated = false;
 					
-					var rect = document.getElementById('canvas').getBoundingClientRect();
+					var rect = canvas.getBoundingClientRect();
 					findClickedX = e.clientX - rect.left;
 					findClickedY = e.clientY - rect.top;
 					lastFoundClicked = null;
-					redraw();
+					if (!doAnimate) redraw();
 					if (null !== lastFoundClicked) {
 						elements[lastFoundClicked].toggleSelected();
 					}
 					findClickedX = -1; findClickedY = -1;
-					redraw();
+					if (!doAnimate) redraw();
 				});
-				window.addEventListener('mousemove', function(e) {
+				canvas.addEventListener('mousemove', function(e) {
 					if (mouseIsDown) {
 						rotPitch -= rotMouseX * 0.005 * (e.clientX - oldPosX);
 						rotRoll +=  rotMouseY * 0.005 * (e.clientY - oldPosY);
@@ -529,10 +536,10 @@
 						oldPosY = e.clientY;
 						recalcRotation();
 						rotated = true;
-						redraw();
+						if (!doAnimate) redraw();
 					}
 				});
-				window.addEventListener('mouseup', function(e) {
+				canvas.addEventListener('mouseup', function(e) {
 					mouseIsDown = false;
 					//deselect selected element if rotation occured
 					if (rotated && null!==lastFoundClicked) {
@@ -540,10 +547,24 @@
 					} else {
 						//console.log(lastFoundClicked);
 					}
-					redraw();
+					if (!doAnimate) redraw();
 					rotated = false;
 				});
+				resize();
+				if (!doAnimate) redraw();
+			} //load
+			
+			function resize() {
+				ctx.canvas.width = window.innerWidth-6;
+				ctx.canvas.height = window.innerHeight-6;
+				scale = window.innerHeight;
+				if (window.innerWidth < window.innerHeight) scale = window.innerWidth;
+				offsetX = scale/1.4;
+				offsetY = scale/2;
+				scale = scale*0.25;
+				forceScale = scale/10;
 			}
+			
 			var previousWindowHeight = 0;
 			var previousWindowWidth = 0;
 			function resizeHandler() {
@@ -551,7 +572,11 @@
 					Math.abs(previousWindowHeight-window.innerHeight) > 3 ||
 					Math.abs(previousWindowWidth-window.innerWidth) > 3
 				) {
-					redraw();
+					previousWindowHeight = window.innerHeight;
+					previousWindowWidth = window.innerWidth;
+				
+					resize();
+					if (!doAnimate) redraw();
 				}
 			}//resizeHandler
 			
@@ -569,14 +594,19 @@
 				<option value="12" selected="selected">Carbon 12</option>
 				<option value="-12">Carbon 12 dist</option>
 			</select><br />
+			<button onclick="selectShape(document.getElementById('shapeSelect').value);">reset</button><br />
 			<input type="checkbox" id="rotMouseX" onchange="rotMouseX*=-1;" /><label for="rotMouseX">swap mouse X</label><br />
 			<input type="checkbox" id="rotMouseY" onchange="rotMouseY*=-1;" /><label for="rotMouseY">swap mouse Y</label><br />
-			<input type="checkbox" id="hardShells" onchange="hardShells = !hardShells; redraw();"
+			<input type="checkbox" id="hardShells" onchange="hardShells = !hardShells; if (!doAnimate) redraw();"
 			 checked="checked" title="magic force preventing particles from merging"/>
 				<label for="hardShells" title="magic force preventing particles from merging">hard shells</label><br />
 			<input type="checkbox" id="animate" onchange="doAnimate = !doAnimate; redraw();" /><label for="animate">animate</label><br />
 			<label for="animationSpeed">animation speed</label><br />
-			<input type="range" id="animationSpeed" min="1" max="100" value="1" />
+			<input type="range" id="animationSpeed" min="1" max="1000" value="50" 
+				onchange="animationSpeed = this.value;" /><br />
+			<label for="animationPrecision">animation precision</label><br />
+			<input type="range" id="animationPrecision" min="10" max="1000" value="200" 
+				onchange="animationPrecision = this.value;" /><br />
 		</div>
 	</body>
 </html>
