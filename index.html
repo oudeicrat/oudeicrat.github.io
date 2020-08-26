@@ -1146,6 +1146,7 @@
 				localViewDocked = !localViewDocked;
 				localViewLeftOffset = localViewDocked ? 0 : localViewUndockedOffset;
 				document.getElementById('localViewDocker').innerHTML = localViewDocked ? 'undock &raquo;' : '&laquo; dock';
+				document.getElementById('controlsDiv').style.display = localViewDocked ? 'none' : 'block';
 				resizeCanvas();
 			}
 
@@ -1557,7 +1558,7 @@
 			<div id="canvasDiv" style="float:left; padding:0px; margin:0px; display:block;"><canvas id="canvasMap"></canvas></div>
 			<div id="celestialDiv" style="position:absolute; padding:0px; margin:0px; display:block;"></div>
 			<div id="topDiv" style="position:absolute; padding:0px; margin:0px; display:block;"><canvas id="canvasTop"></canvas></div>
-			<div id="controlsDiv" style="position:absolute; left:300px; top:0px; padding:0px; margin:0px; width:200px;">
+			<div id="controlsDiv" style="position:absolute; left:300px; top:0px; padding:0px; margin:0px; width:200px; display:block;">
 				<input type="checkbox" id="showObserver" checked="checked" onchange="showObserver = !showObserver; redraw();" />
 				<label for="showObserver">Observer location:</label><br />
 				<input type="text" id="latLongInput" tabindex="1" value="0.00, 0.00" style="width:130px" />
