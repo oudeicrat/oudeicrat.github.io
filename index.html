@@ -36,6 +36,7 @@
 			#locationSelector.searchInProgress div { cursor:wait; }
 			#locationSelector.searchInProgress input { cursor:wait; }
 			#locationSelector div:hover { background-color:#fff; color:#333; }
+			ul#footerLinks { list-style-position:inside; list-style:inside; margin-left:0px; padding-left:0px; }
 		</style>
 		<script type="text/javascript">
 			var jsDate = null;
@@ -69,6 +70,8 @@
 
 			var animateTimePeriod = 30; //framerate in ms
 			var animTimeFactor = 1;
+			
+			var showDockerDiv = true;
 
 			var showEquatorCheckpoints = false;
 			var showSouthCheckpoints = false;
@@ -399,6 +402,14 @@
 			}
 			function outputUTCDateTime(d) {
 				document.getElementById('dateTimeInput').value = getUTCDateTime(d);
+				if (ctx!==null) {
+					var localDate = new Date(d.getTime() + observerGmtOffset);
+					var textOffset = Math.round(canvasSize*0.001);
+					var textSize = Math.round(canvasSize*0.08);
+					ctx.font = textSize+'px Arial';
+					ctx.fillStyle = '#000';
+					ctx.fillText(String('0'+localDate.getUTCHours()).slice(-2)+':'+String('0'+localDate.getUTCMinutes()).slice(-2), textOffset, textOffset+textSize);
+				}
 			}
 
 			function updateAzimuthCheckLink(d, observerGmtOffset) {
@@ -494,7 +505,7 @@
 				var halfTileSize = 1;
 				var angDist = 0;
 				var fillAlpha;
-				var maxAlpha = 0.9;
+				var maxAlpha = 0.94;
 				var gradFrom = 1.55; //PI/2 = 1.5708; refraction = 0.01 at the horizon
 				var gradTo = 1.604;
 				var gradDif = gradTo - gradFrom;
@@ -508,7 +519,7 @@
 							if (angDist < gradTo) {
 								fillAlpha = maxAlpha*(angDist-gradFrom)/gradDif;
 							}
-							topCtx.fillStyle = "rgba(0,0,0,"+fillAlpha+")";
+							topCtx.fillStyle = "rgba(255,255,255,"+fillAlpha+")";
 							topCtx.beginPath();
 							topCtx.rect(x-halfTileSize, y-halfTileSize, tileSize, tileSize);
 							topCtx.fill();
@@ -848,12 +859,22 @@
 				}
 
 				if (doAnimateTime) {
-					jsDate = new Date(jsDate.getTime() + animateTimeInterval*animTimeFactor); //add animateTimeInterval milliseconds
-					outputUTCDateTime(jsDate);
+					advanceAnimation(animateTimeInterval*animTimeFactor);
+					//jsDate = new Date(jsDate.getTime() + animateTimeInterval*animTimeFactor); //add animateTimeInterval milliseconds
+					//outputUTCDateTime(jsDate);
 					if (animateTimeout!==null) clearTimeout(animateTimeout);
 					animateTimeout = setTimeout('redraw(true);',animateTimePeriod);
 				}
 			} //redraw
+			
+			function advanceAnimation(deltaTime) {
+				if (typeof deltaTime === 'undefined' || deltaTime === null) {
+					deltaTime = animateTimeInterval*animTimeFactor;
+				}
+				jsDate = new Date(jsDate.getTime() + deltaTime);
+				outputUTCDateTime(jsDate);
+			}
+			
 			//------------------------------------------------------------------
 			
 			function setAnimationSpeed(sliderValue) {
@@ -1154,6 +1175,8 @@
 
 			function load() {
 				window.setTimeout('populateLocationSelector();',200);
+				
+				document.getElementById('dockerDiv').style.display = showDockerDiv ? 'block' : 'none';
 			
 				if (null !== document.getElementById('canvasMap'))
 					ctx = document.getElementById('canvasMap').getContext('2d');
@@ -1362,45 +1385,6 @@
 
 				//------------------- celestial debug -------------------------
 
-				var debugConfig = {
-					zoomlevel: 0.511,
-					geopos: [90,90], //lat,lon
-
-					//width: canvasSize+'px',     // Default width, 0 = full parent width; height is determined by projection
-					projection: "azimuthalEquidistant",  // Map projection used: airy, aitoff, armadillo, august, azimuthalEqualArea, azimuthalEquidistant, baker, berghaus, boggs, bonne, bromley, collignon, craig, craster, cylindricalEqualArea, cylindricalStereographic, eckert1, eckert2, eckert3, eckert4, eckert5, eckert6, eisenlohr, equirectangular, fahey, foucaut, ginzburg4, ginzburg5, ginzburg6, ginzburg8, ginzburg9, gringorten, hammer, hatano, healpix, hill, homolosine, kavrayskiy7, lagrange, larrivee, laskowski, loximuthal, mercator, miller, mollweide, mtFlatPolarParabolic, mtFlatPolarQuartic, mtFlatPolarSinusoidal, naturalEarth, nellHammer, orthographic, patterson, polyconic, rectangularPolyconic, robinson, sinusoidal, stereographic, times, twoPointEquidistant, vanDerGrinten, vanDerGrinten2, vanDerGrinten3, vanDerGrinten4, wagner4, wagner6, wagner7, wiechel, winkel3
-					//transform: "equatorial", // Coordinate transformation: equatorial (default), ecliptic, galactic, supergalactic
-					//center: [90,90,celestialViewOrientation],       // Initial center coordinates in equatorial transformation [hours, degrees, degrees],
-						// otherwise [degrees, degrees, degrees], 3rd parameter is orientation, null = default center
-					//orientationfixed: true,  // Keep orientation angle the same as center[2]
-					background: { fill: "#fff", stroke: "#fff", opacity: 0.01, width: 0.01, },
-					//adaptable: true,    // Sizes are increased with higher zoom-levels
-					interactive: false,  // Enable zooming and rotation with mousewheel and dragging
-					form: false,        // Display settings form
-					location: false,    // Display location settings
-					controls: false,     // Display zoom controls
-					//lang: "",           // Language for names, so far only for constellations: de: german, es: spanish
-								// Default:en or empty string for english
-					container: "celestialDiv",   // ID of parent element, e.g. div
-					datapath: "celestialdata/",  // Path/URL to data files, empty = subfolder 'data'
-					stars: {
-						show: true,
-						names: false,
-						limit: 4.6
-					},
-					dsos: {show: false},
-					mw: { show: false},
-					constellations: {
-						show: true,
-						names: true,
-					},
-					horizon: { show: true },
-					daylight: { show: false },
-					lines: {
-						graticule: { show: false },
-						equatorial: { show: false, stroke: "#9a8", width: 1.3, opacity: 0.7 },
-						ecliptic: { show: true, stroke: "#66cc66", width: 1.1, opacity: 0.4, dash: [5, 4] },
-					},
-				}; //debugConfig
 				celestialConfig = {
 					zoomlevel: 0.511,
 					geopos: [90,90], //lat,lon
@@ -1427,6 +1411,13 @@
 					constellations: {
 						show: true,
 						names: true,
+						//lineStyle: { stroke: "#cccccc", width: 1.5, opacity: 0.6, 
+						//lineStyle: { stroke: "#f22", width: 1.5, opacity: 0.6, 
+						//	highlightId: 'Oct',
+						//	highlightStyle: { stroke: "#f22", width: 2.5, opacity: 1 },
+						//},
+						//bounds: true,
+						//boundStyle: { stroke: "#cccc00", width: 0.5, opacity: 0.8, dash: [2, 4] }
 					},
 					horizon: { show: false },
 					daylight: { show: false },
@@ -1446,7 +1437,7 @@
 							"mer": {symbol: "\u263f", fill: "#cccccc"},
 							"ven": {symbol: "\u2640", fill: "#eeeecc"},
 							"ter": {symbol: "\u2295", fill: "#00ffff"},
-							"lun": {symbol: "\u25cf", fill: "#ffffff"}, // overridden by generated cresent
+							"lun": {symbol: "\u25cf", fill: "#ffffff", size:18}, // overridden by generated cresent
 							"mar": {symbol: "\u2642", fill: "#ff9999"},
 							"cer": {symbol: "\u26b3", fill: "#cccccc"},
 							"ves": {symbol: "\u26b6", fill: "#cccccc"},
@@ -1468,13 +1459,7 @@
 						
 					}, /* */
 				}; //celestialConfig
-				//debug and fine-tune new d3 celestial
-				/* * /
-				document.getElementById('celestialDiv').style.width = canvasSize+'px';
-				//document.getElementById('celestialDiv').style.height = canvasSize+'px'; //nefunguje
-				document.getElementById('celestialDiv').style.display='block';
-				//Celestial.display(celestialConfig);
-				Celestial.display(debugConfig);
+
 				/* */
 				localCelestialConfig = {
 					zoomlevel: 1,
@@ -1513,7 +1498,7 @@
 							"mer": {symbol: "\u263f", fill: "#cccccc"},
 							"ven": {symbol: "\u2640", fill: "#eeeecc"},
 							"ter": {symbol: "\u2295", fill: "#00ffff"},
-							"lun": {symbol: "\u25cf", fill: "#ffffff"}, // overridden by generated cresent
+							"lun": {symbol: "\u25cf", fill: "#ffffff", size:16}, // overridden by generated cresent
 							"mar": {symbol: "\u2642", fill: "#ff9999"},
 							"cer": {symbol: "\u26b3", fill: "#cccccc"},
 							"ves": {symbol: "\u26b6", fill: "#cccccc"},
@@ -1657,16 +1642,20 @@
 					target="_blank">(check<img src="external.svg" width="10" height="10" />)</a><br />
 				<b id="dayCaption" style="color:#c00;">Red arrow = which direction is the Sun visible on the sky</b>
 				<b id="nightCaption" style="display:none;">The Sun is not visible from observer location</b><br /><br />
-				<a href="https://www.metabunk.org/direction-to-sun-vs-sun-position-above-the-ae-map-visualization.t10401/">metabunk discussion thread</a><br />
-				<a href="https://github.com/oudeicrat/oudeicrat.github.io/issues">report problems, ask questions</a><br />
-
-				<br />
+				<ul id="footerLinks">
+				<li><a href="https://www.metabunk.org/direction-to-sun-vs-sun-position-above-the-ae-map-visualization.t10401/">metabunk discussion thread</a></li>
+				<li><a href="https://github.com/oudeicrat/oudeicrat.github.io/issues">report problems, ask questions</a></li>
+				<li><a href="https://github.com/ofrohn/d3-celestial">stars projection library</a></li>
+				<li><a href="https://mctoon.net/">MC Toon's excellent flat earth debunking resources</a></li>
+				<li><a href="https://flatearth.ws/">another great flat earth annihilating web</a></li>
+				<li><a href="https://flatearthlunacy.com/">more thorough flat earth destruction</a></li>
+				</ul><br />
 				<div id="debug"></div>
 			</div>
 		</div>
 		<div id="localView" style="position:absolute; top:0px; left:0px; width:100px; height:100px; display:none;"
 			onclick="localViewDocker();">
-			<div style="border:solid 1px black; background-color:#ddd; text-align:center;">
+			<div id="dockerDiv" style="border:solid 1px black; background-color:#ddd; text-align:center;">
 				local sky view from the ground 
 				<button id="localViewDocker" onclick="localViewDocker(); event.stopPropagation();">&laquo; dock</button>
 			</div>
@@ -1674,6 +1663,8 @@
 			<div id="localCelestialDiv" style="margin:0px; padding:0px; margin:0px;"></div>
 			<div style="font-weight:bolder; text-align:center;">S</div>
 		</div>
+		<div style="position:absolute; bottom:0px; right:0px; width:200px; height:200px; background-color:red; display:none;"
+			onclick="advanceAnimation(20*60*1000); redraw();"></div>
 		<!--div id="tooltip" style="position:absolute; top:0px; left:0px; display:none; width:140px; background-color:white;">
 			<span id="gcDistanceTooltip" style="font-size:12px; color:#080;"></span>
 			 / <span id="aeDistanceTooltip" style="font-size:12px; color:#b08;"></span>
