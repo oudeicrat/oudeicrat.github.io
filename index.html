@@ -17,7 +17,7 @@
 			//  "azimuthalEquidistant": {n:"Azimuthal Equidistant", arg:null, scale:320, ratio:1.0, clip:true},
 			//to
 			//  "azimuthalEquidistant": {n:"Azimuthal Equidistant", arg:null, scale:320, ratio:1.0, clip:false},
-			
+
 			//in Celestial.projection = function(projection) {
 			//change line
 			//  var coords = raw(-λ, φ);
@@ -65,12 +65,15 @@
 			var doAnimateTime = false;
 			var animateTimeout = null;
 			var oldAnimationSpeedSlider = 0;
+
+			//set in setAnimationSpeed() based on the animationSpeed slider
 			var animateTimeInterval; //add x milliseconds to reference UTC datetime
 			//var animateTimeInterval = 60*24*60*1000; //add 1 day to reference UTC datetime
+			var animateDaily = false;
 
 			var animateTimePeriod = 30; //framerate in ms
 			var animTimeFactor = 1;
-			
+
 			var showDockerDiv = true;
 
 			var showEquatorCheckpoints = false;
@@ -97,7 +100,7 @@
 			var previousLng = 0.00;
 			var oldHorizonLat = null; //for drawing the sky horizon
 			var oldHorizonLng = null;
-			
+
 			var observerGmtOffset = 0; //relative to selected observer position
 			var minutesOffset = 0;
 			var declination = 0;
@@ -110,12 +113,14 @@
 			var routeStartLng = null;
 			var routeEndLat = null;
 			var routeEndLng = null;
-			
+
 			var previewLat = null;
 			var previewLng = null;
 
+			var animationOptionsHideTimeout = null;
+
 			var dateTimeSelectorHideTimeout = null;
-			
+
 			var locationSelectorHideTimeout = null;
 			var locationSelectorSearchTimeout = null;
 			var locationSelectorSearchAbort = false;
@@ -182,7 +187,7 @@
 				if (ctx===null) return false;
 				if (typeof letter === 'undefined' || letter===null) letter = true;
 				coord = gpsToMapXY(lat,lng);
-				
+
 				//line from location to north pole
 				//ctx.lineWidth = 1;
 				//ctx.strokeStyle = '#ccc';
@@ -239,7 +244,7 @@
 					arrowX = arrowEndpoint.x;
 					arrowY = arrowEndpoint.y;
 				}
-				
+
 				var oldGlobalCompositeOperation = null;
 				if (color === false) {
 					oldGlobalCompositeOperation = ctx.globalCompositeOperation;
@@ -277,7 +282,7 @@
 					ctx.stroke();
 					ctx.setLineDash([]);
 				}
-				
+
 				if (null!== oldGlobalCompositeOperation) {
 					ctx.globalCompositeOperation = oldGlobalCompositeOperation;
 				}
@@ -490,7 +495,7 @@
 				}
 
 			}
-			
+
 			function drawSkyHorizon() {
 				if (null === topCtx) return false;
 				topCtx.clearRect(0, 0, topCtx.canvas.width, topCtx.canvas.height);
@@ -500,7 +505,7 @@
 					userLat === 'NaN' ||
 					userLng === 'NaN'
 				) return false;
-				
+
 				var tileSize = 2;
 				var halfTileSize = 1;
 				var angDist = 0;
@@ -514,7 +519,7 @@
 					for (var y=0; y<canvasSize; y+=tileSize) {
 						pos = xyToGps(x,y);
 						angDist = getAngularDistance(pos.lat, pos.lng, userLat, userLng);
-						if (angDist > gradFrom) { 
+						if (angDist > gradFrom) {
 							fillAlpha = maxAlpha;
 							if (angDist < gradTo) {
 								fillAlpha = maxAlpha*(angDist-gradFrom)/gradDif;
@@ -578,7 +583,7 @@
 				//ctx.globalAlpha = 1;
 			}
 			//------------------------------------------------------------------
-			
+
 			function setUserPos(lat,lng) {
 				if (
 					typeof lat === 'undefined' || lat === null ||
@@ -586,9 +591,9 @@
 				) {
 					navigator.geolocation.getCurrentPosition(function(position) {
 						if (
-							!isNaN(position.coords.latitude) && 
+							!isNaN(position.coords.latitude) &&
 							!isNaN(position.coords.longitude) &&
-							position.coords.latitude !== 'NaN' && 
+							position.coords.latitude !== 'NaN' &&
 							position.coords.longitude !== 'NaN' &&
 							position.coords.latitude !== null &&
 							position.coords.longitude !== null
@@ -626,8 +631,8 @@
 
 				//ctx.fillStyle = '#fff';
 				ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-				
-				
+
+
 
 				var parsedUserLocation = /^(-?[0-9]+(?:.[0-9]+)?)[\s,;]+(-?[0-9]+(?:.[0-9]+)?)$/.exec(document.getElementById('latLongInput').value);
 				if (
@@ -643,7 +648,7 @@
 					'NaN' != parseFloat(parsedUserLocation[2])
 				) {
 					setUserPos(parsedUserLocation[1],parsedUserLocation[2]);
-					
+
 				} else {
 					//alert('unknown GPS format, use -12.34, 56.78');
 					document.getElementById('latLongInput').style.backgroundColor = '#fcc';
@@ -690,18 +695,18 @@
 				//console.log(jsDate.getTimezoneOffset());
 
 				if (showStars) { //------------------------------------------------------------------------- show stars
-				
+
 					document.getElementById('celestialDiv').style.display = 'block';
 					if (showLocalView) document.getElementById('localView').style.display = 'block';
-					
+
 					if (!celestialInitialised) {
 						//console.log('initialising Celestial');
 						document.getElementById('celestialDiv').style.width = canvasSize+'px';
 						Celestial.display(celestialConfig);
-						
+
 						//console.log('no co?');
 						Celestial.resize({width:canvasSize});
-						
+
 						for (var i=180;i<4000;i=i*2) setTimeout(function(){ Celestial.date(jsDate); },i); //sometimes the objects don't get rendered if called too soon
 
 
@@ -720,19 +725,22 @@
 						Celestial2nd.resize({width:localCelestialDivSize});
 						Celestial2nd.date(jsDate);
 						localCelestialInitialised = true;
+
+
+
 					}
 					//Celestial.rotate({center:[0,90,celestialViewOrientation]}); //maybe this will be needed?
 					//Celestial.skyview({date:jsDate, location:[90, 0]});
 
 					//TODO: DST (daylight savings time) is breaking the star positions between 25.oct 2020 01:00 and 25.Oct 01:59
-					
+
 					//console.log('------------------------------');
 					//console.log('calling skyview with timezone = '+celestialViewTimezoneOffset+'-'+(jsDate.getTimezoneOffset())+' and date = ',jsDate);
 					//console.log('calling skyview with date = ',jsDate);
 					//console.log('('+jsDate.getUTCHours()+':'+jsDate.getUTCMinutes()+' UTC, offset '+jsDate.getTimezoneOffset()+')');
 					//Celestial.skyview({date:jsDate, timezone:celestialViewTimezoneOffset-jsDate.getTimezoneOffset()});
-					
-					
+
+
 					if (celestialInitialised) {
 						//Celestial.skyview({date:jsDate, timezone:-jsDate.getTimezoneOffset()}); //doesn't work a couple of months from 25.oct 2020
 						Celestial.skyview({date:jsDate}); //doesn't work between 25.oct 2020 01:00 and 25.Oct 01:59
@@ -766,7 +774,7 @@
 					ctx.arc(halfCanvas, halfCanvas, halfCanvas, 0, 2*Math.PI, true);
 					ctx.fill();
 				}
-				
+
 				drawMap();
 				drawSun(sunPos.lat, sunPos.lng);
 
@@ -818,9 +826,9 @@
 									var jsonData = JSON.parse(this.responseText);
 									if ('status' in jsonData && jsonData.status=='OK' && 'gmtOffset' in jsonData) {
 										observerGmtOffset = jsonData.gmtOffset*1000; //eg. GMT+1 -> jsonData.gmtOffset = 3600
-	
+
 										updateAzimuthCheckLink(jsDate, observerGmtOffset);
-	
+
 									} else {
 										//sometimes timezone is not found (for example in the ocean)
 									}
@@ -829,16 +837,16 @@
 							};
 							var timeZoneDbUrl = 'https://api.timezonedb.com/v2.1/get-time-zone?key=H57PYG9KKM6P&format=json&by=position&lat='
 								+ (Math.round(userLat*10000)/10000) + '&lng=' + (Math.round(userLng*10000)/10000);
-	
+
 							xhr.open('get', timeZoneDbUrl);
 							xhr.send();
 						},1200);
 					}
-					
+
 				} else {
 					updateAzimuthCheckLink(jsDate, observerGmtOffset)
 				}
-				
+
 				if (ctx!==null && previewLat!==null && previewLng!==null) {
 					drawCompassGps(previewLat,previewLng,'#e00',11,2,false);
 					/*
@@ -851,7 +859,7 @@
 					ctx.stroke();
 					ctx.fill(); /* */
 				}
-				
+
 				if (userLat!==oldHorizonLat || userLng!==oldHorizonLng) {
 					drawSkyHorizon();
 					oldHorizonLat = userLat;
@@ -859,14 +867,19 @@
 				}
 
 				if (doAnimateTime) {
-					advanceAnimation(animateTimeInterval*animTimeFactor);
+					//animateTimeInterval set in setAnimationSpeed() from 10011 to 7200000
+					if (animateDaily) {
+						advanceAnimation(Math.round(Math.sqrt(animateTimeInterval)/100)*24*60*60*1000);
+					} else {
+						advanceAnimation(animateTimeInterval*animTimeFactor);
+					}
 					//jsDate = new Date(jsDate.getTime() + animateTimeInterval*animTimeFactor); //add animateTimeInterval milliseconds
 					//outputUTCDateTime(jsDate);
 					if (animateTimeout!==null) clearTimeout(animateTimeout);
 					animateTimeout = setTimeout('redraw(true);',animateTimePeriod);
 				}
 			} //redraw
-			
+
 			function advanceAnimation(deltaTime) {
 				if (typeof deltaTime === 'undefined' || deltaTime === null) {
 					deltaTime = animateTimeInterval*animTimeFactor;
@@ -874,15 +887,15 @@
 				jsDate = new Date(jsDate.getTime() + deltaTime);
 				outputUTCDateTime(jsDate);
 			}
-			
+
 			//------------------------------------------------------------------
-			
+
 			function setAnimationSpeed(sliderValue) {
 				if (sliderValue === oldAnimationSpeedSlider) return false;
 				//animateTimeInterval in milliseconds
-				animateTimeInterval = Math.round(179*sliderValue*sliderValue + 151.6*sliderValue + 9680);
+				animateTimeInterval = Math.round(179*sliderValue*sliderValue + 151.6*sliderValue + 9680); //result from 10011 to 7200000
 				oldAnimationSpeedSlider = sliderValue;
-				//console.log(sliderValue, animateTimeInterval);
+				//console.log(animateTimeInterval);
 			}
 
 			function setMarchEquinox() {
@@ -941,7 +954,7 @@
 						Celestial2nd.resize({width:localCelestialDivSize});
 					}
 				}
-				
+
 				if (ctx!==null) {
 					ctx.canvas.width = canvasSize;
 					ctx.canvas.height = canvasSize;
@@ -998,7 +1011,7 @@
 				document.getElementById('aeDistance').style.fontWeight = 'bold';
 				document.getElementById('aeDistance').innerText = Math.round(aeDist)+' km';
 				//document.getElementById('aeDistanceTooltip').innerText = Math.round(aeDist)+' km';
-				
+
 				//calculate pixel distance ("FE" distance based on meridian distances)
 				var feDist = Math.sqrt((endX-startX)*(endX-startX)+(endY-startY)*(endY-startY)) / (canvasSize) * 40008;
 				document.getElementById('feDistance').style.fontWeight = 'bold';
@@ -1063,16 +1076,22 @@
 				var routeStartXY = gpsToMapXY(routeStartLat,routeStartLng);
 				var routeEndXY = gpsToMapXY(routeEndLat,routeEndLng);
 				showDistanceOnCanvas(routeStartXY.x,routeStartXY.y,routeEndXY.x,routeEndXY.y);
-				
-				
+
+
 				routeStartLat = null; routeStartLng = null;
+			}
+
+
+			function hideAnimationOptions() {
+				animationOptionsHideTimeout = null;
+				document.getElementById('animationOptions').style.display = 'none';
 			}
 
 			function hideDateTimeSelector() {
 				dateTimeSelectorHideTimeout = null;
 				document.getElementById('dateTimeSelector').style.display = 'none';
 			}
-				
+
 			function hideLocationSelector() {
 				locationSelectorHideTimeout = null;
 				document.getElementById('locationSelector').style.display = 'none';
@@ -1080,7 +1099,7 @@
 				previewLng = null;
 				redraw();
 			}
-			
+
 			function populateLocationSelector() {
 				var ls = document.getElementById('locationSelector');
 				var idCnt = 0;
@@ -1099,19 +1118,19 @@
 							previewLat = null;
 							previewLng = null;
 							redraw();
-						});	
+						});
 						cityElement.addEventListener('mouseover', function(event) {
 							previewLat = cityLat;
 							previewLng = cityLng;
 							//console.log('set preview to ',previewLat,previewLng);
 							redraw();
-						});	
+						});
 					})(citiesGps[i][1],citiesGps[i][2]);
-					
-					
+
+
 					//TODO: show cities on map on hover
-					
-					locationSelectorElements.push([idCnt,citiesGps[i][0],citiesGps[i][1],citiesGps[i][2]]);
+
+					locationSelectorElements.push([idCnt,citiesGps[i][0].toLowerCase().replace(/[^a-z -]+/i,''),citiesGps[i][1],citiesGps[i][2]]);
 					idCnt++;
 				}
 				//console.log('done populating location selector');
@@ -1125,7 +1144,9 @@
 					previewLng = null;
 					redraw();
 				}
-				
+
+				val = val.toLowerCase().replace(/[^a-z -]+/i,'');
+
 				if (val!=='') {
 					//search
 					//[ 0: element id number, 1: city name, 2: lat, 3: lng ]
@@ -1135,7 +1156,8 @@
 					for (var i in locationSelectorElements) {
 						cntAll++;
 						if (locationSelectorSearchAbort) return false;
-						if (-1 < locationSelectorElements[i][1].toLowerCase().indexOf(val)) {
+						//if (-1 < locationSelectorElements[i][1].toLowerCase().indexOf(val)) { //full search (slow)
+						if (locationSelectorElements[i][1].startsWith(val)) { //search from the beginning only (faster)
 							document.getElementById('ls'+locationSelectorElements[i][0]).style.display = 'block';
 							cntFound++;
 						} else {
@@ -1162,7 +1184,7 @@
 				document.getElementById('latLongInput').style.cursor = 'default';
 				document.getElementById('locationSelector').style.display = 'block';
 			}
-			
+
 			function localViewDocker() {
 				localViewDocked = !localViewDocked;
 				localViewLeftOffset = localViewDocked ? 0 : localViewUndockedOffset;
@@ -1175,9 +1197,9 @@
 
 			function load() {
 				window.setTimeout('populateLocationSelector();',200);
-				
+
 				document.getElementById('dockerDiv').style.display = showDockerDiv ? 'block' : 'none';
-			
+
 				if (null !== document.getElementById('canvasMap'))
 					ctx = document.getElementById('canvasMap').getContext('2d');
 				if (null !== document.getElementById('canvasTop'))
@@ -1283,7 +1305,7 @@
 						event.preventDefault(); //stop context menu
 					}, false);
 				} //canvasTop works
-					
+
 				document.getElementById('gcDistance').addEventListener('contextmenu', function(event) {
 					showDistanceGpsModal = !showDistanceGpsModal;
 					if (!showDistanceGpsModal) {
@@ -1309,9 +1331,9 @@
 				document.getElementById('distLng2').addEventListener('keyup', function(event) {
 					if (event.key === 'Enter') showDistanceGps();
 				});
-				
+
 				//--------------------------------------------------------------- location selector
-				
+
 				function locationSearch(query) {
 					query = query.toLowerCase();
 					if (locationSearchLast === query) return false;
@@ -1328,7 +1350,7 @@
 				}
 				document.getElementById('latLongInput').addEventListener('keyup', function(event) {
 					event.preventDefault();
-					
+
 					document.getElementById('latLongInput').style.backgroundColor = '#fff';
 					if (RegExp('^[a-zA-Z ]*$').test(document.getElementById('latLongInput').value)) {
 						locationSearch(document.getElementById('latLongInput').value);
@@ -1341,7 +1363,7 @@
 					event.preventDefault();
 					locationSearch(document.getElementById('locationSearch').value);
 				});
-				
+
 				document.getElementById('latLongInput').addEventListener('mouseover', function(event) {
 					if (null!==locationSelectorHideTimeout) window.clearTimeout(locationSelectorHideTimeout);
 					document.getElementById('locationSelector').style.display = 'block';
@@ -1357,7 +1379,25 @@
 					if (null!==locationSelectorHideTimeout) window.clearTimeout(locationSelectorHideTimeout);
 					locationSelectorHideTimeout = setTimeout('hideLocationSelector();',300);
 				});
-				
+
+				//-------------------------------------------------------------- animation options
+				document.getElementById('animationSettings').addEventListener('mouseover', function(event) {
+					if (null!==animationOptionsHideTimeout) window.clearTimeout(animationOptionsHideTimeout);
+					document.getElementById('animationOptions').style.display = 'block';
+				});
+				document.getElementById('animationSettings').addEventListener('mouseout', function(event) {
+					if (null!==animationOptionsHideTimeout) window.clearTimeout(animationOptionsHideTimeout);
+					animationOptionsHideTimeout = setTimeout('hideAnimationOptions();',300);
+				});
+				//document.getElementById('animationOptions').addEventListener('mouseover', function(event) {
+				//	if (null!==animationOptionsHideTimeout) window.clearTimeout(animationOptionsHideTimeout);
+				//});
+				//document.getElementById('animationOptions').addEventListener('mouseout', function(event) {
+				//	if (null!==animationOptionsHideTimeout) window.clearTimeout(animationOptionsHideTimeout);
+				//	animationOptionsHideTimeout = setTimeout('hideAnimationOptions();',300);
+				//});
+
+
 				//-------------------------------------------------------------- time selector
 				document.getElementById('dateTimeInput').addEventListener('mouseover', function(event) {
 					if (null!==dateTimeSelectorHideTimeout) window.clearTimeout(dateTimeSelectorHideTimeout);
@@ -1411,8 +1451,8 @@
 					constellations: {
 						show: true,
 						names: true,
-						//lineStyle: { stroke: "#cccccc", width: 1.5, opacity: 0.6, 
-						//lineStyle: { stroke: "#f22", width: 1.5, opacity: 0.6, 
+						//lineStyle: { stroke: "#cccccc", width: 1.5, opacity: 0.6,
+						//lineStyle: { stroke: "#f22", width: 1.5, opacity: 0.6,
 						//	highlightId: 'Oct',
 						//	highlightStyle: { stroke: "#f22", width: 2.5, opacity: 1 },
 						//},
@@ -1426,7 +1466,7 @@
 						equatorial: { show: false, stroke: "#9a8", width: 1.3, opacity: 0.7 },
 						ecliptic: { show: true, stroke: "#66cc66", width: 1.1, opacity: 0.4, dash: [5, 4] },
 					},
-	
+
 					/* */
 					planets: {
 						show: true,
@@ -1448,7 +1488,7 @@
 							"plu": {symbol: "\u2647", fill: "#aaaaaa"},
 							"eri": {symbol: "\u25cf", fill: "#eeeeee"}
 						},
-						
+
 						//symbolStyle: { fill: "#00ccff", font: "bold 17px 'Lucida Sans Unicode', Consolas, sans-serif", align: "center", baseline: "middle" },
 						//symbolType: "symbol",  // Type of planet symbol: 'symbol' graphic planet sign, 'disk' filled circle scaled by magnitude
 						// 'letter': 1 or 2 letters S Me V L Ma J S U N
@@ -1456,7 +1496,7 @@
 						//nameStyle: { fill: "#00ccff", font: "14px 'Lucida Sans Unicode', Consolas, sans-serif", align: "right", baseline: "top" },
 						//namesType: "desig"     // Language of planet name (see list below of language codes available for planets),
 						// or desig = 3-letter designation
-						
+
 					}, /* */
 				}; //celestialConfig
 
@@ -1473,7 +1513,7 @@
 					//center: [90,90,celestialViewOrientation],       // Initial center coordinates in equatorial transformation [hours, degrees, degrees],
 						// otherwise [degrees, degrees, degrees], 3rd parameter is orientation, null = default center
 					orientationfixed: true,  // Keep orientation angle the same as center[2]
-					
+
 					background: { fill: "#000", stroke: "#000", opacity: 1, width: 1, },
 					//adaptable: true,    // Sizes are increased with higher zoom-levels
 					interactive: false,  // Enable zooming and rotation with mousewheel and dragging
@@ -1510,7 +1550,7 @@
 							"eri": {symbol: "\u25cf", fill: "#eeeeee"}
 						}
 					},
-					
+
 					dsos: {show: false},
 					mw: { show: false},
 					constellations: {
@@ -1528,13 +1568,13 @@
 				//Celestial2nd.display(localCelestialConfig);
 
 			} //load()
-			
+
 			function localRotate(orientation) {
 				var center = Celestial2nd.rotate();
 				center[2] = orientation;
 				Celestial2nd.rotate({center:center});
 			}
-			
+
 		</script>
 	</head>
 	<body onload="load();" onresize="setTimeout('resizeHandler();',10);">
@@ -1548,7 +1588,7 @@
 				<label for="showObserver">Observer location:</label><br />
 				<input type="text" id="latLongInput" tabindex="1" value="0.00, 0.00" style="width:130px" />
 				<button onclick="setTimeout('redraw();',10);">GO</button><br />
-				<div id="locationSelector" style="position:absolute; width:185px; max-height:340px; 
+				<div id="locationSelector" style="position:absolute; width:185px; max-height:340px;
 					overflow:auto; background:#bbb; display:none; z-index:5;">
 					<button onclick="setUserPos();" style="width:85px; padding:0px;">get local</button><br />
 					<input type="text" id="locationSearch" placeholder="search" style="width:140px;" /><br /><br />
@@ -1563,30 +1603,37 @@
 				<label for="flatDirection"> flatearth direction to Sun</label><br />
 				<br />
 
+
+				<div id="animationSettings">
+					<input type="checkbox" id="animateCheckbox" /><label for="animateCheckbox">animate</label>
+
+					/ speed:
+					<br />
+					<input type="range" id="animationSpeed" min="1" max="200" value="5"
+						onchange="setAnimationSpeed(this.value);" oninput="setAnimationSpeed(this.value);" />
+						<div id="animationOptions" style="position:absolute; width:180px; height:32px; border:solid 1px black; background-color:#ddd; display:none;">
+							<input type="checkbox" id="animateBackwards" /><label for="animateBackwards">backwards</label>
+							<input type="checkbox" id="animateDaily" onclick="animateDaily = !animateDaily;" /><label for="animateDaily">daily</label><br />
+						</div>
+				</div>
+
+
 				<input type="checkbox" id="starsCheckbox" title="stars, planets and constellations" />
 				<label for="starsCheckbox" title="stars, planets and constellations">sky</label>
-				<input type="checkbox" id="daylightCheckbox" 
+				<input type="checkbox" id="daylightCheckbox"
 					title="Earth surface daylight"
 					onchange="showDaylight = !showDaylight; if (localCelestialInitialised) Celestial2nd.apply({daylight: { show: showDaylight }}); redraw();" />
 				<label for="daylightCheckbox" title="Earth surface daylight">day</label>
-				<input type="checkbox" id="skyHorizonCheckbox" 
-					title="sky horizon relative to observer position" 
+				<input type="checkbox" id="skyHorizonCheckbox"
+					title="sky horizon relative to observer position"
 					onchange="showSkyHorizon = !showSkyHorizon; drawSkyHorizon();" />
 				<label for="skyHorizonCheckbox" title="sky horizon relative to observer position">sky horizon</label>
 				<br />
+				<br />
 
-				<input type="checkbox" id="animateCheckbox" /><label for="animateCheckbox">animate</label>
-				(<input type="checkbox" id="animateBackwards" /><label for="animateBackwards">back</label>)
-				speed:
-				<br />
-				<input type="range" id="animationSpeed" min="1" max="200" value="5"
-					onchange="setAnimationSpeed(this.value);" oninput="setAnimationSpeed(this.value);" />
-				<br />
-					
-				
 				Greenwich London time (UTC)<br />
 				<input type="text" id="dateTimeInput" value="" style="width:130px" /><button onclick="setTimeout('redraw();',10);">set</button><br />
-				<div id="dateTimeSelector" style="position:absolute; width:160px; height:90px; 
+				<div id="dateTimeSelector" style="position:absolute; width:160px; height:90px;
 					background:#ccc; border:solid 1px black; padding:3px; display:none; z-index:4;">
 					<a href="#" onclick="return setMonth(1);">Jan</a>
 					<a href="#" onclick="return setMonth(2);">Feb</a>
@@ -1605,7 +1652,7 @@
 					<a href="#" onclick="return setSeptemberEquinox();">September equinox</a><br />
 					<a href="#" onclick="return setDecemberSolstice();">December solstice</a><br />
 				</div>
-	
+
 				<span id="gcDistance" style="font-size:12px; color:#080; padding-left:4px;">right-click to measure distance</span>
 				 / <span id="aeDistance" style="font-size:12px; color:#b08;"></span><br />
 				 <span id="feDistance" style="font-size:12px; color:#008;"></span>
@@ -1619,11 +1666,11 @@
 
 					<button onclick="document.getElementById('distLat1').value = userLat;
 						document.getElementById('distLng1').value = userLng;
-						routeStartLat = userLat; routeStartLng = userLng;" 
+						routeStartLat = userLat; routeStartLng = userLng;"
 						style="width:80px;" title="measure distance from observer location">from obs.</button>
 					<button onclick="document.getElementById('distLat2').value = userLat;
 						document.getElementById('distLng2').value = userLng;
-						routeEndLat = userLat; routeEndLng = userLng;" 
+						routeEndLat = userLat; routeEndLng = userLng;"
 						style="width:80px;" title="measure distance to observer location">to obs.</button>
 					<br />
 					<button onclick="showDistanceGps();" style="width:60px;">GO</button>
@@ -1634,11 +1681,11 @@
 
 				Sun pos:<br />
 				<input type="text" id="latLongOutput" value="" readonly="readonly" style="width:105px" />
-				<a id="sunPosCheckLink" href="https://www.timeanddate.com/worldclock/sunearth.html" 
+				<a id="sunPosCheckLink" href="https://www.timeanddate.com/worldclock/sunearth.html"
 					target="_blank">(check<img src="external.svg" width="10" height="10" />)</a><br />
 				Zenith, azimuth:<br />
 				<input type="text" id="zenAzOutput" value="0.00, 0.00" readonly="readonly" style="width:105px" />
-				<a id="azimuthCheckLink" href="https://suncalc.org/" 
+				<a id="azimuthCheckLink" href="https://suncalc.org/"
 					target="_blank">(check<img src="external.svg" width="10" height="10" />)</a><br />
 				<b id="dayCaption" style="color:#c00;">Red arrow = which direction is the Sun visible on the sky</b>
 				<b id="nightCaption" style="display:none;">The Sun is not visible from observer location</b><br /><br />
@@ -1656,7 +1703,7 @@
 		<div id="localView" style="position:absolute; top:0px; left:0px; width:100px; height:100px; display:none;"
 			onclick="localViewDocker();">
 			<div id="dockerDiv" style="border:solid 1px black; background-color:#ddd; text-align:center;">
-				local sky view from the ground 
+				local sky view from the ground
 				<button id="localViewDocker" onclick="localViewDocker(); event.stopPropagation();">&laquo; dock</button>
 			</div>
 			<div style="font-weight:bolder; text-align:center;">N</div>
