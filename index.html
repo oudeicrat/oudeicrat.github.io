@@ -935,7 +935,11 @@
 				canvasSizeReciprocal = 1/canvasSize;
 				//document.getElementById('mainContainer').style.width = (localViewLeftOffset+canvasSize)+'px';
 				document.getElementById('canvasDiv').style.width = canvasSize+'px';
-				document.getElementById('controlsDiv').style.left = canvasSize+'px';
+				var controlsDivMargin = 18;
+				if (window.innerWidth-6 < canvasSize + controlsDivMargin + 200)
+					controlsDivMargin = window.innerWidth-6 - canvasSize - 200;
+				if (controlsDivMargin < 0) controlsDivMargin = 0;
+				document.getElementById('controlsDiv').style.left = (controlsDivMargin+canvasSize)+'px';
 				document.getElementById('topDiv').style.width = canvasSize+'px';
 				document.getElementById('localView').style.left = (localViewLeftOffset+canvasSize)+'px';
 				localCelestialDivSize = window.innerWidth-canvasSize-localViewLeftOffset-12;
