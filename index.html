@@ -869,7 +869,7 @@
 				if (doAnimateTime) {
 					//animateTimeInterval set in setAnimationSpeed() from 10011 to 7200000
 					if (animateDaily) {
-						advanceAnimation(Math.round(Math.sqrt(animateTimeInterval)/100)*24*60*60*1000);
+						advanceAnimation(Math.round(Math.sqrt(animateTimeInterval)/100)*24*60*60*1000*animTimeFactor);
 					} else {
 						advanceAnimation(animateTimeInterval*animTimeFactor);
 					}
