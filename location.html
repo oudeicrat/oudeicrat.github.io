@@ -25,11 +25,11 @@ function display1() {
     	settimezone: false, //should help with DST glitching?
 
         background: { fill: "#000", stroke: "#000" }, //added in 7
-    	//lines: {
-    	//	graticule: { show: false },
-    	//	equatorial: { show: false, stroke: "#9a8", width: 1.3, opacity: 0.7 },
-    	//	ecliptic: { show: true, stroke: "#66cc66", width: 1.1, opacity: 0.4, dash: [5, 4] },
-    	//},
+    	lines: { //added in 8
+    		graticule: { show: false },
+    		equatorial: { show: false, stroke: "#9a8", width: 1.3, opacity: 0.7 },
+    		ecliptic: { show: true, stroke: "#66cc66", width: 1.1, opacity: 0.4, dash: [5, 4] },
+    	},
     });
 }
 function display2() {
@@ -48,11 +48,13 @@ function display2() {
     	settimezone: false, //should help with DST glitching?
 
     	//background: { fill: "#000", stroke: "#000" }, //removed in 7
-    	lines: {
-    		graticule: { show: false },
-    		equatorial: { show: false, stroke: "#9a8", width: 1.3, opacity: 0.7 },
-    		ecliptic: { show: true, stroke: "#66cc66", width: 1.1, opacity: 0.4, dash: [5, 4] },
-    	},
+
+    	//lines: { //removed in 8
+    	//	graticule: { show: false },
+    	//	equatorial: { show: false, stroke: "#9a8", width: 1.3, opacity: 0.7 },
+    	//	ecliptic: { show: true, stroke: "#66cc66", width: 1.1, opacity: 0.4, dash: [5, 4] },
+    	//},
+
         /* //removed in 6
     	stars: {
     		show: true,
@@ -74,7 +76,7 @@ function display2() {
 </head>
 <body>
 
-v.7
+v.8
 
     <br /><button onclick="display1();">show 1</button><button onclick="display2();">show 2</button><br />
   <div style="overflow:hidden;"><div id="celestial-map" style="width:500px; background-color:#000;"></div></div>
