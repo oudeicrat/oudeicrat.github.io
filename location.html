@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8">
   <title>D3-Celestial Starmap</title>
-  <script type="text/javascript" src="lib/d3.js"></script>
+  <script type="text/javascript" src="lib/d3debug.js"></script>
   <script type="text/javascript" src="lib/d3.geo.projection.js"></script>
-  <script type="text/javascript" src="celestial.js"></script>
+  <script type="text/javascript" src="celestialDebug.js"></script>
   <link rel="stylesheet" href="celestial.css">
   <script type="text/javascript">
 
 function doDisplaySky() {
+    /* * /
     Celestial.display({ //original celestial location demo
     	location: true,
     	settimezone: false, //should help with DST glitching?
@@ -17,8 +18,9 @@ function doDisplaySky() {
     	datapath: "celestialdata/",
     	planets:  { show: true }
     });
+    /* */
 
-    /*
+    /* */
     Celestial.display({ //test
       location: true,
       projection: "azimuthalEquidistant",
@@ -57,7 +59,7 @@ function doDisplaySky() {
 
 </head>
 <body>
-    <button onclick="doDisplaySky();">show</button><br />
+    <button onclick="setTimeout('doDisplaySky();',10);">show</button><br />
   <div style="overflow:hidden;"><div id="celestial-map" style="width:500px; background-color:#000;"></div></div>
   <div id="celestial-form"></div>
 

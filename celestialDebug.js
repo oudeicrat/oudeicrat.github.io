@@ -33,7 +33,6 @@ var cfg, mapProjection, zoom, map, circle, daylight, starnames = {}, dsonames = 
 
 // Show it all, with the given config, otherwise with default settings
 Celestial.display = function(config) {
-    console.log('called celestial display');
   var parentElement, animationID,
       container = Celestial.container,
       animations = [],
@@ -136,6 +135,7 @@ Celestial.display = function(config) {
   }
 
   function load() {
+      console.log('called load');
     //Background
     setClip(projectionSetting.clip);
     container.append("path").datum(graticule.outline).attr("class", "outline");
@@ -166,13 +166,13 @@ Celestial.display = function(config) {
     }
 
     //Milky way outline
-    console.log('going to load mw.json');
+    console.log('going to request mw.json');
     d3.json(path + "mw.json", function(error, json) {
+        console.log('mw.json request completed');
       if (error) {
         window.alert("Data file could not be loaded or doesn't exist. See readme.md");
         return console.warn(error);
       }
-      console.log('loaded mw.json');
 
       var mw = getData(json, cfg.transform);
       var mw_back = getMwbackground(mw);
@@ -293,6 +293,7 @@ Celestial.display = function(config) {
 
     if (cfg.lang && cfg.lang != "") apply(Celestial.setLanguage(cfg.lang));
     //redraw();
+    console.log('exiting load()');
   }
 
   // Zoom by factor; >1 larger <1 smaller
@@ -3457,10 +3458,10 @@ function geo(cfg) {
 
   function setPosition(p, settime) {
     if (!p || !has(config, "settimezone") || config.settimezone === false) {
-    	console.log('skipping timezone application');
+    	//console.log('skipping timezone application');
 		return;
 	}
-    console.log('processing timezone');
+    //console.log('processing timezone');
     var timestamp = Math.floor(date.getTime() / 1000),
         protocol = window && window.location.protocol === "https:" ? "https" : "http",
         url = protocol + "://api.timezonedb.com/v2.1/get-time-zone?key=" + config.timezoneid + "&format=json&by=position" +
@@ -4682,10 +4683,8 @@ function exportSVG(fname) {
   //Milky way outline
   if (cfg.mw.show) {
     q.defer(function(callback) {
-        console.log('going to load mw.json',cfg.mw.show);
       d3.json(path + "mw.json", function(error, json) {
         if (error) callback(error);
-        console.log('loaded mw.json');
 
         var mw = getData(json, cfg.transform);
         var mw_back = getMwbackground(mw);
