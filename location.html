@@ -10,17 +10,19 @@
   <script type="text/javascript">
 
 function doDisplaySky() {
-    /* * /
-    Celestial.display({ //original celestial location demo
+    /* */
+    Celestial.display({
     	location: true,
-    	settimezone: false, //should help with DST glitching?
+    	settimezone: false,
     	projection: "airy",
     	datapath: "celestialdata/",
-    	planets:  { show: true }
+    	planets:  { show: true },
+        dsos: {show: false},
+    	mw: { show: false},
     });
     /* */
 
-    /* */
+    /* * /
     Celestial.display({ //test
       location: true,
       projection: "azimuthalEquidistant",
