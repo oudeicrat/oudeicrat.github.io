@@ -12,15 +12,16 @@
 function display1() {
     Celestial.display({
     	location: true,
-        projection: "airy",
+        projection: "azimuthalEquidistant",
+        //projection: "airy",
         datapath: "celestialdata/",
     });
 }
 function display2() {
     Celestial.display({ //test
         location: true,
-        projection: "azimuthalEquidistant",
-        //projection: "airy",
+        //projection: "azimuthalEquidistant",
+        projection: "airy",
         datapath: "celestialdata/",
 
     	dsos: {show: false},
@@ -57,7 +58,7 @@ function display2() {
 </head>
 <body>
 
-v.2
+v.3
 
     <br /><button onclick="display1();">show 1</button><button onclick="display2();">show 2</button><br />
   <div style="overflow:hidden;"><div id="celestial-map" style="width:500px; background-color:#000;"></div></div>
