@@ -9,33 +9,44 @@
   <link rel="stylesheet" href="celestial.css">
   <script type="text/javascript">
 
-function doDisplaySky() {
-    /* */
+function display1() {
     Celestial.display({
     	location: true,
-    	settimezone: false,
-    	projection: "airy",
-    	datapath: "celestialdata/",
-    	planets:  { show: true },
-        dsos: {show: false},
-    	mw: { show: false},
-    });
-    /* */
+        projection: "airy",
+        datapath: "celestialdata/",
 
-    /* * /
+        dsos: {show: false},
+        mw: { show: false},
+
+        zoomlevel: 0.511,
+    	geopos: [90,90], //lat,lon
+
+        settimezone: false,
+
+        constellations: {
+    		show: true,
+    		names: true,
+    	},
+    	horizon: { show: false },
+    	daylight: { show: false },
+
+    	planets:  { show: true },
+    });
+}
+function display2() {
     Celestial.display({ //test
-      location: true,
-      projection: "azimuthalEquidistant",
-      datapath: "celestialdata/",
+        location: true,
+        projection: "azimuthalEquidistant",
+        datapath: "celestialdata/",
 
     	dsos: {show: false},
     	mw: { show: false},
+
     	zoomlevel: 0.511,
     	geopos: [90,90], //lat,lon
-    	settimezone: false, //should help with DST glitching?
-    	projection: "azimuthalEquidistant",
-    	//center: [0,90,0],
-    	//center:[90,0,0],
+
+    	//settimezone: false, //should help with DST glitching?
+
     	background: { fill: "#000", stroke: "#000" },
     	lines: {
     		graticule: { show: false },
@@ -54,14 +65,14 @@ function doDisplaySky() {
     	horizon: { show: false },
     	daylight: { show: false },
 
-      planets:  { show: true }
-    });/* */
+        planets:  { show: true },
+    });
 }
   </script>
 
 </head>
 <body>
-    <button onclick="doDisplaySky();">show</button><br />
+    <button onclick="display1();">show 1</button><button onclick="display2();">show 2</button><br />
   <div style="overflow:hidden;"><div id="celestial-map" style="width:500px; background-color:#000;"></div></div>
   <div id="celestial-form"></div>
 
