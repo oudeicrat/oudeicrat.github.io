@@ -12,31 +12,16 @@
 function display1() {
     Celestial.display({
     	location: true,
-        projection: "airy",
+        //projection: "airy",
+        projection: "azimuthalEquidistant",
         datapath: "celestialdata/",
-
-        dsos: {show: false},
-        mw: { show: false},
-
-        zoomlevel: 0.511,
-    	geopos: [90,90], //lat,lon
-
-        settimezone: false,
-
-        constellations: {
-    		show: true,
-    		names: true,
-    	},
-    	horizon: { show: false },
-    	daylight: { show: false },
-
-    	planets:  { show: true },
     });
 }
 function display2() {
     Celestial.display({ //test
         location: true,
-        projection: "azimuthalEquidistant",
+        projection: "airy",
+        //projection: "azimuthalEquidistant",
         datapath: "celestialdata/",
 
     	dsos: {show: false},
@@ -44,8 +29,6 @@ function display2() {
 
     	zoomlevel: 0.511,
     	geopos: [90,90], //lat,lon
-
-    	//settimezone: false, //should help with DST glitching?
 
     	background: { fill: "#000", stroke: "#000" },
     	lines: {
