@@ -12,19 +12,19 @@
 function display1() {
     Celestial.display({
     	location: true,
-        projection: "azimuthalEquidistant",
-        //projection: "airy",
+        //projection: "azimuthalEquidistant",
+        projection: "airy",
         datapath: "celestialdata/",
 
-        dsos: {show: false},
-    	mw: { show: false},
+        //dsos: {show: false},
+    	//mw: { show: false},
 
-        zoomlevel: 0.511,
-    	geopos: [90,90], //lat,lon
+        //zoomlevel: 0.511,
+    	//geopos: [90,90], //lat,lon
 
-    	settimezone: false, //should help with DST glitching?
+    	//settimezone: false, //should help with DST glitching?
 
-        background: { fill: "#000", stroke: "#000" }, //added in 7
+        //background: { fill: "#000", stroke: "#000" },
     	lines: { //added in 8
     		graticule: { show: false },
     		equatorial: { show: false, stroke: "#9a8", width: 1.3, opacity: 0.7 },
@@ -47,7 +47,7 @@ function display2() {
 
     	settimezone: false, //should help with DST glitching?
 
-    	//background: { fill: "#000", stroke: "#000" }, //removed in 7
+    	background: { fill: "#000", stroke: "#000" },
 
     	//lines: { //removed in 8
     	//	graticule: { show: false },
@@ -55,7 +55,6 @@ function display2() {
     	//	ecliptic: { show: true, stroke: "#66cc66", width: 1.1, opacity: 0.4, dash: [5, 4] },
     	//},
 
-        /* //removed in 6
     	stars: {
     		show: true,
     		names: false,
@@ -64,11 +63,11 @@ function display2() {
     	constellations: {
     		show: true,
     		names: true,
-    	},*/
+    	},
 
-    	//horizon: { show: false }, //removed in 5
-    	//daylight: { show: false },
-        //planets:  { show: true },
+    	horizon: { show: false },
+    	daylight: { show: false },
+        planets:  { show: true },
     });
 }
   </script>
@@ -76,7 +75,7 @@ function display2() {
 </head>
 <body>
 
-v.8
+v.9
 
     <br /><button onclick="display1();">show 1</button><button onclick="display2();">show 2</button><br />
   <div style="overflow:hidden;"><div id="celestial-map" style="width:500px; background-color:#000;"></div></div>
