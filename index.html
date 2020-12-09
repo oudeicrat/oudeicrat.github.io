@@ -31,11 +31,11 @@
 			input { font-family:Arial; font-size:12px; }
 			button { font-family:Arial; font-size:12px; }
 			#locationSelector { border:solid 1px #000; padding:2px; padding-bottom:7px; cursor:default; }
-			#locationSelector div { cursor:default; }
+			#locationSelector div div { cursor:default; }
 			#locationSelector.searchInProgress { cursor:wait; }
-			#locationSelector.searchInProgress div { cursor:wait; }
+			#locationSelector.searchInProgress div div { cursor:wait; }
 			#locationSelector.searchInProgress input { cursor:wait; }
-			#locationSelector div:hover { background-color:#fff; color:#333; }
+			#locationSelector div div:hover { background-color:#fff; color:#333; }
 			ul#footerLinks { list-style-position:inside; list-style:inside; margin-left:0px; padding-left:0px; }
 		</style>
 		<script type="text/javascript">
@@ -51,9 +51,11 @@
 
 			var ctx = null;
 			var topCtx = null;
+			var barCtx = null;
 			var celestialViewTimezoneOffset = 0; //-360; //correction for d3 celestial sky orientation
 			var celestialViewOrientation = 0; //90; //this value doesn't do anything //alternative correction for sky orientation
 			var showObserver = true;
+			//var showObserver = false; //tmp for analema
 			var showSkyHorizon = false;
 			var showStars = false;
 			var showLocalView = true;
@@ -61,6 +63,9 @@
 			var celestialInitialised = false;
 			var localCelestialInitialised = false;
 			var showDaylight = true;
+			//var showDaylight = false; //tmp for analema
+			var showSunAltitude = false;
+			var showSunFetitude = false; //sun altitude predicted by a flat earth model
 
 			var doAnimateTime = false;
 			var animateTimeout = null;
@@ -125,7 +130,8 @@
 			var locationSelectorSearchTimeout = null;
 			var locationSelectorSearchAbort = false;
 			var locationSearchLast = null;
-			var locationSelectorElements = []; //[ 0: element id number, 1: city name, 2: lat, 3: lng ]
+			
+			var locationSelectorGroups = []; //[ 0: first char code, 1: array of element groups [ 0: element id number, 1: city name, 2: lat, 3: lng ] ]
 			function drawMap() {
 				if (ctx===null) return false;
 				var imageObj = document.getElementById('mapimg');
@@ -136,9 +142,10 @@
 				ctx.globalAlpha = 1;
 			}
 
-			function gpsToMapXY(lat,lng) {
-				var y = Math.round(canvasSize/2+(90-lat)/360*canvasSize*Math.cos(-lng/180*Math.PI));
-				var x = Math.round(canvasSize/2+(lat-90)/360*canvasSize*Math.sin(-lng/180*Math.PI));
+			function gpsToMapXY(lat,lng,scale) {
+				if (typeof scale === 'undefined' || scale===null) scale = canvasSize;
+				var y = Math.round(scale/2+(90-lat)/360*scale*Math.cos(-lng/180*Math.PI));
+				var x = Math.round(scale/2+(lat-90)/360*scale*Math.sin(-lng/180*Math.PI));
 				return {x,y};
 			}
 			function xyToGps(x,y) {
@@ -174,11 +181,14 @@
 
 			function drawSun(lat,lng) {
 				if (ctx===null) return false;
+				//ctx.fillStyle = '#f44'; //tmp for analema
 				ctx.fillStyle = '#fd0';
 				ctx.beginPath();
 				coord = gpsToMapXY(lat,lng);
 				ctx.lineWidth = 2;
+				//ctx.arc(coord.x, coord.y, 1, 0, 2*Math.PI, true); //tmp for analema
 				ctx.arc(coord.x, coord.y, 10, 0, 2*Math.PI, true); //3rd param = radius
+				//ctx.strokeStyle = '#f44'; //tmp for analema
 				ctx.strokeStyle = '#fb0';
 				ctx.stroke();
 				if (!showStars) ctx.fill();
@@ -553,9 +563,10 @@
 						pos = xyToGps(x,y);
 						if (pos !== false) {
 							visibility = isSunVisible(pos, htcOffset, sinDecl, cosDecl);
-							drawNightSegment = true;
+							drawNightSegment = false;
 							//ctx.globalAlpha = 1;
 							fillAlpha = 1;
+							fillColorCSV = '0,0,0';
 							if (visibility > 0.1) {
 								drawNightSegment = false;
 								//if (visibility > 0.85) {
@@ -566,13 +577,16 @@
 								//	ctx.fill();
 								//}
 							} else if (visibility > -0.2) {
+								drawNightSegment = true;
 								fillAlpha = 1-(visibility+0.2)*3.33;
 								//ctx.globalAlpha = fillAlpha;
+							} else {
+								drawNightSegment = true;
 							}
 
 							if (drawNightSegment) {
 								//ctx.fillStyle = '#000';
-								ctx.fillStyle = "rgba(0,0,0,"+fillAlpha+")";
+								ctx.fillStyle = "rgba("+fillColorCSV+","+fillAlpha+")";
 								ctx.beginPath();
 								ctx.rect(x-halfTileSize, y-halfTileSize, tileSize, tileSize);
 								ctx.fill();
@@ -581,6 +595,62 @@
 					}
 				}
 				//ctx.globalAlpha = 1;
+			}
+			//------------------------------------------------------------------
+			function getRgbGradient(scale) {
+				var result = '0,0,0';
+				var sp1 = 0.17;
+				var sp2 = 0.6
+				if (scale > -0.06 && scale < 0.000000001) {
+					result = '0,255,0';
+				} else if (scale >= 0.000000001 && scale <= sp1) {
+					result = '0,'+Math.round(255.0-255.0/sp1*scale)+','+Math.round(255.0/sp1*scale);
+				} else if (scale > sp1 && scale <= sp2) {
+					result = Math.round((255.0/(sp2-sp1))*(scale-sp1))+',0,'+Math.round((255.0/(sp2-sp1))*(sp2-scale));
+				} else if (scale > sp2) {
+					result = '255,'+Math.round(255.0/(1-sp2)*(scale-sp2))+',0';
+				}
+				return result;
+			}
+			
+			
+			function drawSunAltitude(sunPos) {
+				//sunPos contains: htcOffset, sinDecl, cosDecl, sunLat, sunLng
+				//sunPos.htcOffset, sunPos.sinDecl, sunPos.cosDecl, sunPos.lat, sunPos.lng
+				if (topCtx===null) return false;
+				var tileSize = 4;
+				var halfTileSize = 2;
+				var visibility = -1;
+				var pos = false;
+				//var minAngle = 91;
+				var sunCoord = gpsToMapXY(sunPos.lat,sunPos.lng);
+
+				for (var x=0; x<canvasSize; x+=tileSize) {
+					for (var y=0; y<canvasSize; y+=tileSize) {
+						pos = xyToGps(x,y);
+						if (pos !== false) {
+							if (showSunFetitude) {
+								//FE sun altitude
+								
+								visibility = 2*Math.atan2(canvasSize/8,Math.sqrt((x-sunCoord.x)*(x-sunCoord.x)+(y-sunCoord.y)*(y-sunCoord.y))) / Math.PI;
+								//smallest angle should be 8.72 degrees (antarctic midnight in december on a FE)
+								//if (visibility*90 < minAngle) minAngle = visibility*90;
+
+							} else {
+								//real sun altitude
+								visibility = isSunVisible(pos, sunPos.htcOffset, sunPos.sinDecl, sunPos.cosDecl);
+							}
+							
+							fillColorCSV = getRgbGradient(visibility);
+
+							topCtx.fillStyle = "rgba("+fillColorCSV+",1)";
+							topCtx.beginPath();
+							topCtx.rect(x-halfTileSize, y-halfTileSize, tileSize, tileSize);
+							topCtx.fill();
+						}
+					}
+				}
+				//console.log(minAngle);
 			}
 			//------------------------------------------------------------------
 
@@ -630,7 +700,7 @@
 				if (animateTimeout!==null) clearTimeout(animateTimeout);
 
 				//ctx.fillStyle = '#fff';
-				ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+				ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); //tmp for analema commented
 
 
 
@@ -766,16 +836,22 @@
 				var sunPos = getSunPos(jsDate,{'lat':userLat,'lng':userLng});
 				if (showDaylight) {
 					drawNight(sunPos.htcOffset, sunPos.sinDecl, sunPos.cosDecl);
-				} else {
+				}
+				if (showSunAltitude || showSunFetitude) {
+					drawSunAltitude(sunPos);
+				}
+				if (!showDaylight && !showSunAltitude && !showSunFetitude) {
 					//darken the whole map so stars are visible
+					/* */ //tmp for analema commented
 					ctx.fillStyle = '#000';
 					var halfCanvas = Math.round(canvasSize/2);
 					ctx.beginPath();
 					ctx.arc(halfCanvas, halfCanvas, halfCanvas, 0, 2*Math.PI, true);
 					ctx.fill();
+					/* */
 				}
 
-				drawMap();
+				drawMap(); //tmp for analema commented
 				drawSun(sunPos.lat, sunPos.lng);
 
 				if (sunPos.lat != 'NaN' && sunPos.lng != 'NaN')
@@ -1108,13 +1184,25 @@
 				var ls = document.getElementById('locationSelector');
 				var idCnt = 0;
 				var cityElement = null;
+				var firstLetterCode = null;
+				var groupElement = null;
+				var lastGroupIndex = 0;
 				for (var i in citiesGps) {
+					if (groupElement===null || firstLetterCode !== citiesGps[i][0].toLowerCase().charCodeAt(0)) {
+						firstLetterCode = citiesGps[i][0].toLowerCase().charCodeAt(0);
+						groupElement = document.createElement('DIV');
+						groupElement.id = 'lsg'+firstLetterCode;
+						groupElement.style.display = 'block';
+						ls.appendChild(groupElement);
+						locationSelectorGroups.push([firstLetterCode,[]]);
+						lastGroupIndex = locationSelectorGroups.length-1;
+					}
 					cityElement = document.createElement('DIV');
 					cityElement.innerText = citiesGps[i][0];
-					cityElement.id = 'ls'+idCnt;
+					cityElement.id = 'ls'+firstLetterCode+'_'+idCnt;
 					cityElement.style.display = 'block';
 					//cityElement.style.cursor = 'inherit';
-					ls.appendChild(cityElement);
+					groupElement.appendChild(cityElement);
 					(function(cityLat,cityLng){
 						cityElement.addEventListener('click', function(event) {
 							document.getElementById('latLongInput').style.backgroundColor = '#fff';
@@ -1131,10 +1219,13 @@
 						});
 					})(citiesGps[i][1],citiesGps[i][2]);
 
-
-					//TODO: show cities on map on hover
-
-					locationSelectorElements.push([idCnt,citiesGps[i][0].toLowerCase().replace(/[^a-z -]+/i,''),citiesGps[i][1],citiesGps[i][2]]);
+					locationSelectorGroups[lastGroupIndex][1].push(
+						[
+							idCnt,
+							citiesGps[i][0].toLowerCase().replace(/[^a-z -]+/i,''),
+							citiesGps[i][1],citiesGps[i][2]
+						]
+					);
 					idCnt++;
 				}
 				//console.log('done populating location selector');
@@ -1152,35 +1243,51 @@
 				val = val.toLowerCase().replace(/[^a-z -]+/i,'');
 
 				if (val!=='') {
+					var firstCharCode = val.charCodeAt(0);
 					//search
 					//[ 0: element id number, 1: city name, 2: lat, 3: lng ]
 					var cntAll = 0;
 					var cntFound = 0;
 					var cntHidden = 0;
-					for (var i in locationSelectorElements) {
-						cntAll++;
-						if (locationSelectorSearchAbort) return false;
-						//if (-1 < locationSelectorElements[i][1].toLowerCase().indexOf(val)) { //full search (slow)
-						if (locationSelectorElements[i][1].startsWith(val)) { //search from the beginning only (faster)
-							document.getElementById('ls'+locationSelectorElements[i][0]).style.display = 'block';
-							cntFound++;
+					var foundGroup = null;
+					for (var g in locationSelectorGroups) {
+						//hide all except matching firstCharCode
+						if (locationSelectorGroups[g][0] === firstCharCode) {
+							foundGroup = locationSelectorGroups[g];
+							document.getElementById('lsg'+locationSelectorGroups[g][0]).style.display = 'block';
 						} else {
-							(function(cityDiv){
-								setTimeout(function(){
-									document.getElementById(cityDiv).style.display = 'none';
-								},1);
-							})('ls'+locationSelectorElements[i][0]);
-							cntHidden++;
+							document.getElementById('lsg'+locationSelectorGroups[g][0]).style.display = 'none';
 						}
-						//if (cntFound > 33 || document.getElementById('locationSelector').scrollHeight > 500) {
-							//document.getElementById('locationSelector').style.overflow = 'auto';
-						//}
+					}
+					if (null !== foundGroup) {
+						for (var i in foundGroup[1]) {
+							cntAll++;
+							if (locationSelectorSearchAbort) return false;
+							if (foundGroup[1][i][1].startsWith(val)) { //search from the beginning only
+								document.getElementById('ls'+firstCharCode+'_'+foundGroup[1][i][0]).style.display = 'block';
+								cntFound++;
+							} else {
+								(function(cityDiv){
+									setTimeout(function(){
+										document.getElementById(cityDiv).style.display = 'none';
+									},1);
+								})('ls'+firstCharCode+'_'+foundGroup[1][i][0]);
+								cntHidden++;
+							}
+							//if (cntFound > 33 || document.getElementById('locationSelector').scrollHeight > 500) {
+								//document.getElementById('locationSelector').style.overflow = 'auto';
+							//}
+						}
 					}
 					//console.log('search finished',cntAll,cntFound,cntHidden);
 					//console.log(document.getElementById('locationSelector').scrollHeight);
 				} else {
-					for (var i in locationSelectorElements) {
-						document.getElementById('ls'+locationSelectorElements[i][0]).style.display = 'block';
+					//display all
+					for (var g in locationSelectorGroups) {
+						document.getElementById('lsg'+locationSelectorGroups[g][0]).style.display = 'block';
+						for (var i in locationSelectorGroups[g][1]) {
+							document.getElementById('ls'+locationSelectorGroups[g][0]+'_'+locationSelectorGroups[g][1][i][0]).style.display = 'block';
+						}
 					}
 				}
 				//document.getElementById('locationSelector').style.cursor = 'default';
@@ -1208,6 +1315,20 @@
 					ctx = document.getElementById('canvasMap').getContext('2d');
 				if (null !== document.getElementById('canvasTop'))
 					topCtx = document.getElementById('canvasTop').getContext('2d');
+				if (null !== document.getElementById('canvasBar')) {
+					barCtx = document.getElementById('canvasBar').getContext('2d');
+					var fillColorCSV = '0,0,0';
+					for (var i=0.0; i<200.0; i+=1.0) {
+						var fillColorCSV = getRgbGradient(i/200.0);
+						barCtx.fillStyle = "rgba("+fillColorCSV+",1)";
+						barCtx.beginPath();
+						barCtx.rect(Math.round(i), 0, Math.round(i+1), 10);
+						barCtx.fill();
+					}
+						
+					
+					
+				}
 
 				//tooltipStyle = document.getElementById('tooltip').style;
 				document.getElementById('animateCheckbox').addEventListener('change', function(event) {
@@ -1418,11 +1539,82 @@
 					if (null!==dateTimeSelectorHideTimeout) window.clearTimeout(dateTimeSelectorHideTimeout);
 					dateTimeSelectorHideTimeout = setTimeout('hideDateTimeSelector();',300);
 				});
+				
+				document.getElementById('daylightCheckbox').addEventListener('change', function(event) {
+					showDaylight = !showDaylight; 
+					if (localCelestialInitialised) 
+						Celestial2nd.apply({daylight: { show: showDaylight }}); 
+					redraw();
+				});
+				
+				
+				document.getElementById('skyHorizonCheckbox').addEventListener('change', function(event) {
+					showSkyHorizon = !showSkyHorizon;
+					if (showSkyHorizon) {
+						document.getElementById('sunAltitudeBar').style.display = 'none';
+						showSunAltitude = false;
+						document.getElementById('sunAltitudeCheckbox').checked = false;
+						showSunFetitude = false;
+						document.getElementById('sunFetitudeCheckbox').checked = false; 
+					}
+					drawSkyHorizon();
+					redraw();
+				});
+				
+				
+				document.getElementById('sunAltitudeCheckbox').addEventListener('change', function(event) {
+					showSunAltitude = !showSunAltitude;
+					if (showSunAltitude) {
+						document.getElementById('sunAltitudeBar').style.display = 'block';
+						showSkyHorizon = false;
+						document.getElementById('skyHorizonCheckbox').checked = false;
+						showSunFetitude = false;
+						document.getElementById('sunFetitudeCheckbox').checked = false; 
+					} else {
+						document.getElementById('sunAltitudeBar').style.display = 'none';
+					}
+					drawSkyHorizon(); //to clear to topCtx (and sky horizon)
+					redraw();
+				});
+				document.getElementById('sunFetitudeCheckbox').addEventListener('change', function(event) {
+					showSunFetitude = !showSunFetitude;
+					if (showSunFetitude) {
+						document.getElementById('sunAltitudeBar').style.display = 'block';
+						showSkyHorizon = false;
+						document.getElementById('skyHorizonCheckbox').checked = false;
+						showSunAltitude = false;
+						document.getElementById('sunAltitudeCheckbox').checked = false; 
+					} else {
+						document.getElementById('sunAltitudeBar').style.display = 'none';
+					}
+					drawSkyHorizon(); //to clear to topCtx (and sky horizon)
+					redraw();
+				});
+				
+				
 
 
 				resizeCanvas();
 
 				//--------------------------------------------------------------
+				if (typeof sunPos !== 'undefined' && sunPos !== null) {
+					if (showDaylight) {
+						drawNight(sunPos.htcOffset, sunPos.sinDecl, sunPos.cosDecl); //showDaylight and showSunAltitude are taken into account inside drawNight()
+					}
+					if (showSunAltitude || showSunFetitude) {
+						drawSunAltitude(sunPos);
+					}
+				}
+				
+				if (!showDaylight && !showSunAltitude && !showSunFetitude) {
+					//darken the whole map so stars are visible
+					ctx.fillStyle = '#000';
+					var halfCanvas = Math.round(canvasSize/2);
+					ctx.beginPath();
+					ctx.arc(halfCanvas, halfCanvas, halfCanvas, 0, 2*Math.PI, true);
+					ctx.fill();
+				}
+				drawMap();
 
 				redraw();
 
@@ -1626,14 +1818,32 @@
 				<input type="checkbox" id="starsCheckbox" title="stars, planets and constellations" />
 				<label for="starsCheckbox" title="stars, planets and constellations">sky</label>
 				<input type="checkbox" id="daylightCheckbox"
-					title="Earth surface daylight"
-					onchange="showDaylight = !showDaylight; if (localCelestialInitialised) Celestial2nd.apply({daylight: { show: showDaylight }}); redraw();" />
+					title="Earth surface daylight" />
 				<label for="daylightCheckbox" title="Earth surface daylight">day</label>
 				<input type="checkbox" id="skyHorizonCheckbox"
-					title="sky horizon relative to observer position"
-					onchange="showSkyHorizon = !showSkyHorizon; drawSkyHorizon();" />
+					title="sky horizon relative to observer position" />
 				<label for="skyHorizonCheckbox" title="sky horizon relative to observer position">sky horizon</label>
 				<br />
+
+				<input type="checkbox" id="sunAltitudeCheckbox"
+					title="color map of observed Sun altitude above horizon" />
+				<label for="sunAltitudeCheckbox" title="color map of observed Sun altitude above horizon">Sun altitude</label>
+
+				<input type="checkbox" id="sunFetitudeCheckbox"
+					title="color map of flat Earth Sun altitude above horizon" />
+				<label for="sunFetitudeCheckbox" title="color map of flat Earth Sun altitude above horizon">FE Sun alt.</label>
+				
+				<br />
+				<div id="sunAltitudeBar" style="display:none; padding:0px; margin:0px; height:26px; width:200px;">
+					<canvas id="canvasBar" width="200" height="10"></canvas><br />
+					<div style="width:27px; text-align:left; float:left;">0&deg;</div>
+					<div style="width:30px; text-align:left; float:left;">15&deg;</div>
+					<div style="width:29px; text-align:left; float:left;">30&deg;</div>
+					<div style="width:28px; text-align:center; float:left;">45&deg;</div>
+					<div style="width:29px; text-align:right; float:left;">60&deg;</div>
+					<div style="width:30px; text-align:right; float:left;">75&deg;</div>
+					<div style="width:27px; text-align:right; float:left;">90&deg;</div>
+				</div>
 				<br />
 
 				Greenwich London time (UTC)<br />
@@ -1664,10 +1874,10 @@
 				<div id="distanceGpsModal" style="display:none; border:solid 1px black; padding:6px; line-height:25px;
 					font-size:12px; text-align:center; width:180px; background-color:#ffc; position:absolute; z-index:3;">
 					measure distance between:<br />
-					<label for="distLat1">lat:</label><input type="text" id="distLat1" style="width:60px;" />&nbsp;
-					<label for="distLng1">lon:</label><input type="text" id="distLng1" style="width:60px;" /><br />
-					<label for="distLat2">lat:</label><input type="text" id="distLat2" style="width:60px;" />&nbsp;
-					<label for="distLng2">lon:</label><input type="text" id="distLng2" style="width:60px;" /><br />
+					<label for="distLat1">lat:</label><input type="text" id="distLat1" style="width:45px;" />&nbsp;
+					<label for="distLng1">lon:</label><input type="text" id="distLng1" style="width:45px;" /><br />
+					<label for="distLat2">lat:</label><input type="text" id="distLat2" style="width:45px;" />&nbsp;
+					<label for="distLng2">lon:</label><input type="text" id="distLng2" style="width:45px;" /><br />
 
 					<button onclick="document.getElementById('distLat1').value = userLat;
 						document.getElementById('distLng1').value = userLng;
@@ -1695,9 +1905,10 @@
 				<b id="dayCaption" style="color:#c00;">Red arrow = which direction is the Sun visible on the sky</b>
 				<b id="nightCaption" style="display:none;">The Sun is not visible from observer location</b><br /><br />
 				<ul id="footerLinks">
-				<li><a href="https://www.metabunk.org/direction-to-sun-vs-sun-position-above-the-ae-map-visualization.t10401/">metabunk discussion thread</a></li>
-				<li><a href="https://github.com/oudeicrat/oudeicrat.github.io/issues">report problems, ask questions</a></li>
+				<li><b style="font-weight:bolder; color:#000; background-color:#ff0;">*NEW*:</b> <a href="https://github.com/oudeicrat/oudeicrat.github.io/discussions/1"><b>comment, discuss, ask questions</b></a></li>
+				<li><a href="https://github.com/oudeicrat/oudeicrat.github.io/issues">report problems</a></li>
 				<li><a href="https://github.com/ofrohn/d3-celestial">stars projection library</a></li>
+				<li><a href="https://www.metabunk.org/direction-to-sun-vs-sun-position-above-the-ae-map-visualization.t10401/">metabunk discussion thread</a></li>
 				<li><a href="https://mctoon.net/">MC Toon's excellent flat earth debunking resources</a></li>
 				<li><a href="https://flatearth.ws/">another great flat earth annihilating web</a></li>
 				<li><a href="https://flatearthlunacy.com/">more thorough flat earth destruction</a></li>
